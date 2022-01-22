@@ -48,8 +48,10 @@ def apply_blur(root: str, nb_imgs = 49, target_sz: list = [357, 637]):
             while avg_cnt < nb_imgs:
                 tmp = imageio.imread(dir[idx+avg_cnt], pilmode='RGB').astype(float)
                 tmp_rsz = Rsz(torch.tensor(tmp, device=device).permute(2,0,1))
-                if avg_cnt == int(nb_imgs/2):
-                    sharp_img = tmp_rsz.clone().permute(1,2,0)
+                if avg_cnt == 0:
+                    sharp_left = tmp_rsz.clone().permute(1,2,0)
+                elif avg_cnt == nb_imgs-1:
+                    sharp_right = tmp_rsz.clone().permute(1, 2, 0)
                 aft_gam_inv = gamma_inv(tmp_rsz)
                 resized_im = aft_gam_inv.unsqueeze(0)
                 # Stack images for PSF convolutions
@@ -70,7 +72,9 @@ def apply_blur(root: str, nb_imgs = 49, target_sz: list = [357, 637]):
             Path(bl_path).mkdir(parents=True, exist_ok=True)
             Path(sh_path).mkdir(parents=True, exist_ok=True)
             imageio.imwrite(os.path.join(bl_path, f"{res_cnt}.png"), blr_img.type(torch.uint8))
-            imageio.imwrite(os.path.join(sh_path, f"{res_cnt}.png"), sharp_img.type(torch.uint8))
+            imageio.imwrite(os.path.join(sh_path, f"{res_cnt}_L.png"), sharp_left.type(torch.uint8))
+            imageio.imwrite(os.path.join(sh_path, f"{res_cnt}_R.png"), sharp_right.type(torch.uint8))
+
             res_cnt += 1
             if res_cnt%10 == 0:
                 print(f"Number of processed images: {res_cnt}/{total_train_imgs+total_test_imgs}")
