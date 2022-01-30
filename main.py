@@ -1,5 +1,5 @@
 import os
-from data.preprocess import apply_blur
+from preprocess import apply_blur
 
 
 def main():
