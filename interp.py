@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from math import ceil
 from skimage.io import imread
+import re
 
 from argparse import Namespace
 
@@ -44,7 +45,7 @@ def load_abme_ckpt():
 
 
 def get_frame(sbmnet: torch.nn.Module, abmnet: torch.nn.Module, synnet: torch.nn.Module,
-              frame1: torch.Tensor, frame3: torch.Tensor):
+              frame1: torch.Tensor, frame3: torch.Tensor, oflow: torch.Tensor = None):
 
 
     with torch.no_grad():
@@ -66,8 +67,11 @@ def get_frame(sbmnet: torch.nn.Module, abmnet: torch.nn.Module, synnet: torch.nn
         frame1_ = F.interpolate(frame1, (H_, W_), mode='bicubic')
         frame3_ = F.interpolate(frame3, (H_, W_), mode='bicubic')
 
-        SBM = sbmnet(torch.cat((frame1_, frame3_), dim=1))[0]
-        SBM_= F.interpolate(SBM, scale_factor=4, mode='bilinear') * 20.0
+        if oflow is None:
+            SBM = sbmnet(torch.cat((frame1_, frame3_), dim=1))[0]
+            SBM_= F.interpolate(SBM, scale_factor=4, mode='bilinear') * 20.0
+        else:
+            SBM_= F.interpolate(oflow, (H_, W_), mode='bilinear') / 6
 
         frame2_1, Mask2_1 = warp(frame1_, SBM_ * (-1),  return_mask=True)
         frame2_3, Mask2_3 = warp(frame3_, SBM_       ,  return_mask=True)
@@ -114,15 +118,19 @@ def get_frame(sbmnet: torch.nn.Module, abmnet: torch.nn.Module, synnet: torch.nn
 
 
 def create_interpolations(sbmnet: torch.nn.Module, abmnet: torch.nn.Module, synnet: torch.nn.Module,
-                          images_list: list, first_place: int, second_place: int):
+                          images_list: list, first_place: int, second_place: int, oflow: torch.tensor):
     if second_place - 1 <= first_place:
         return images_list
 
     middle_place = first_place + int(math.ceil(second_place - first_place) / 2)
-    images_list[middle_place] = get_frame(sbmnet, abmnet, synnet,
-                                          images_list[first_place], images_list[second_place])
-    create_interpolations(sbmnet, abmnet, synnet, images_list, first_place, middle_place)
-    create_interpolations(sbmnet, abmnet, synnet, images_list, middle_place, second_place)
+    if first_place == 0 and second_place == len(images_list):
+        images_list[middle_place] = get_frame(sbmnet, abmnet, synnet,
+                                              images_list[first_place], images_list[second_place], oflow)
+    else:
+        images_list[middle_place] = get_frame(sbmnet, abmnet, synnet,
+                                              images_list[first_place], images_list[second_place])
+    create_interpolations(sbmnet, abmnet, synnet, images_list, first_place, middle_place, oflow)
+    create_interpolations(sbmnet, abmnet, synnet, images_list, middle_place, second_place, oflow)
 
     return images_list
 
@@ -135,7 +143,8 @@ def gamma(img: np.ndarray, gamm: float = 2.2):
     return img**(gamm)
 
 
-def get_interpolations(first_image: str, second_image: str, num_of_images: int, resize_func, apply_gamma: bool = True):
+def get_interpolations(first_image: str, second_image: str,
+                       num_of_images: int, resize_func, apply_gamma: bool = True, opticalf: str=None):
     images_list = [None] * (num_of_images + 2)
 
     im1 = resize_func(TF.to_tensor(imread(first_image)))
@@ -150,10 +159,53 @@ def get_interpolations(first_image: str, second_image: str, num_of_images: int, 
     images_list[num_of_images + 1] = last_frame
 
     sbmnet, abmnet, synnet = load_abme_ckpt()
-    images_list = create_interpolations(sbmnet, abmnet, synnet, images_list, 0, num_of_images + 1)
+    if opticalf is not None:
+        oflow_ten = -readPFM(opticalf)[0][..., :2]
+        oflow = torch.tensor(oflow_ten).to("cuda")
+    else:
+        oflow = None
+    images_list = create_interpolations(sbmnet, abmnet, synnet, images_list, 0, num_of_images + 1, oflow)
     torch_images_list = torch.cat(images_list)
     # for idx in range(torch_images_list.shape[0]):
     #     if apply_gamma:
     # torch_images_list[idx] = gamma(torch_images_list[idx])
 
     return torch_images_list
+
+
+def readPFM(file):
+    file = open(file, 'rb')
+
+    color = None
+    width = None
+    height = None
+    scale = None
+    endian = None
+
+    header = file.readline().rstrip()
+    if header.decode("ascii") == 'PF':
+        color = True
+    elif header.decode("ascii") == 'Pf':
+        color = False
+    else:
+        raise Exception('Not a PFM file.')
+
+    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline().decode("ascii"))
+    if dim_match:
+        width, height = list(map(int, dim_match.groups()))
+    else:
+        raise Exception('Malformed PFM header.')
+
+    scale = float(file.readline().decode("ascii").rstrip())
+    if scale < 0: # little-endian
+        endian = '<'
+        scale = -scale
+    else:
+        endian = '>' # big-endian
+
+    data = np.fromfile(file, endian + 'f')
+    shape = (height, width, 3) if color else (height, width)
+
+    data = np.reshape(data, shape)
+    data = np.flipud(data)
+    return data, scale

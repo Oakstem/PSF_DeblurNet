@@ -1,4 +1,5 @@
 import os
+import argparse
 from preprocess import apply_blur
 
 
@@ -9,8 +10,14 @@ def main():
     # GOPRO_Large_all/
     #   train/
     #   test/
+    parser = argparse.ArgumentParser(description='Applying Blur effect with PSF encoding')
+    parser.add_argument('--start_indx', '-si', default=0, type=int, help='scene index to start with,'
+                                                                         'choose between 0-24 for Monkaa')
+    parser.add_argument('--gamm', '-g', action='store_true', help='Choose whether to apply gamma')
+    parser.add_argument('--sz', default=[270, 480], type=list, help='Target image size')
+    args = parser.parse_args()
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
-    apply_blur(abs_path)
+    apply_blur(abs_path, start_scn_indx=args.start_indx, apply_gamma=args.gamm, target_sz=args.sz)
 
 if __name__ == "__main__":
     main()
