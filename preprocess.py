@@ -9,8 +9,8 @@ from torchvision.transforms import Resize
 from torchvision import transforms
 
 if torch.cuda.is_available():
-    from interp import get_interpolations
-
+    # from interp import get_interpolations
+    from interpolations.interpolations import get_interpolations
 
 
 def gamma_inv(img: np.ndarray, gamm: float = 2.2):
@@ -18,7 +18,7 @@ def gamma_inv(img: np.ndarray, gamm: float = 2.2):
 
 
 def gamma(img: np.ndarray, gamm: float = 2.2):
-    return img**(gamm)
+    return torch.pow(img, gamm)
 
 
 def get_interp_nb(flow_root: str, scene_name: str, img_name: str, min_nb:int=5, max_pxl_step: int=100, scale_reduct: int=2):
@@ -94,29 +94,38 @@ def load_cam_models(device: torch.device):
 
 
 def create_scene_dir(target_root: str, filename: str, idx: int):
-    scene_name = filename.split("/")[-3]
+    # Windows / Linux environment different paths
+    if len(filename.split("/")) > len(filename.split("\\")):
+        scene_name = filename.split("/")[-3]
+    else:
+        scene_name = filename.split("\\")[-3]
     print(f"scene_name:{scene_name}, index:{idx}")
     Path(os.path.join(target_root, scene_name)).mkdir(parents=True, exist_ok=True)
     return scene_name
 
 
 def get_blurred_img_path(target_root: str, scene_name: str, filename: str):
-    img_name = filename.split("/")[-1]
+    if len(filename.split("/")) > len(filename.split("\\")):
+        img_name = filename.split("/")[-1]
+    else:
+        img_name = filename.split("\\")[-1]
     blr_path = os.path.join(target_root, f"{scene_name}/{img_name}")
     return blr_path, img_name
 
 
-def apply_psf(cam: list, psfs: list, batch: torch.Tensor, nb_imgs: int, apply_gamma: bool):
+def apply_psf(cam: list, psfs: list, batch: torch.Tensor, nb_imgs: int, apply_gamma: bool=True):
     # Apply PSF convolution to the stacked images
     if nb_imgs == 23:
         blr_img = cam[0](batch, psfs[0])
     else:
         blr_img = cam[1](batch, psfs[1])
-    # Apply back the gamma func
     if apply_gamma:
         blr_img = gamma(blr_img)
-        # blr_img = blr_img.round()
+    # Apply back the gamma func
     blr_img = transforms.ToPILImage()(blr_img).convert("RGB")
+
+        # blr_img = blr_img.round()
+
     return blr_img
 
 
@@ -146,8 +155,8 @@ def apply_blur(root: str, start_scn_indx: int=0,
         scene_name = create_scene_dir(target_root, imgs_list[idx][0], idx)
 
         # Loop through all images in the scene
-        for idx, img in enumerate(imgs_list[idx][:-nb_GT_in_batch+1]):
-            img_pair = imgs_list[idx][idx:idx+nb_GT_in_batch]
+        for idy, img in enumerate(imgs_list[idx][:-nb_GT_in_batch+1]):
+            img_pair = imgs_list[idx][idy:idy+nb_GT_in_batch]
 
             # Get blurred img path
             blr_path, img_name = get_blurred_img_path(target_root, scene_name, img)
@@ -171,7 +180,7 @@ def apply_blur(root: str, start_scn_indx: int=0,
                 res_cnt += 1
                 if res_cnt%10 == 0:
                     elapsed = time.time() - t
-                    print(f"Number of processed images: {res_cnt}/{total_imgs}, index:{idx}, time per image:{elapsed/(res_cnt-cnt_prev)}sec")
+                    print(f"Number of processed images: {res_cnt}/{total_imgs}, scene index:{idx}, time per image:{(elapsed/(res_cnt-cnt_prev)):0.1f} sec")
                     cnt_prev = res_cnt
                     t = time.time()
 

@@ -147,11 +147,13 @@ def get_interpolations(first_image: str, second_image: str,
                        num_of_images: int, resize_func, apply_gamma: bool = True, opticalf: str=None):
     images_list = [None] * (num_of_images + 2)
 
-    im1 = resize_func(TF.to_tensor(imread(first_image)))
-    im2 = resize_func(TF.to_tensor(imread(second_image)))
+    im1 = imread(first_image)
+    im2 = imread(second_image)
     if apply_gamma:
         im1 = gamma_inv(im1)
         im2 = gamma_inv(im2)
+    im1 = resize_func(TF.to_tensor(im1))
+    im2 = resize_func(TF.to_tensor(im2))
     first_frame = im1.unsqueeze(0).cuda()
     last_frame = im2.unsqueeze(0).cuda()
 

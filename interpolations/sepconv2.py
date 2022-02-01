@@ -11,7 +11,7 @@ import PIL.Image
 import sys
 import typing
 
-import sepconv # the custom separable convolution layer
+from interpolations import sepconv  # the custom separable convolution layer
 
 ##########################################################
 
@@ -19,23 +19,7 @@ torch.set_grad_enabled(False) # make sure to not compute gradients for computati
 
 torch.backends.cudnn.enabled = True # make sure to use cudnn for computational performance
 
-##########################################################
 
-arguments_strModel = 'paper'
-arguments_strOne = './images/one.png'
-arguments_strTwo = './images/two.png'
-arguments_strVideo = './videos/car-turn.mp4'
-arguments_strOut = './out.png'
-
-for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [strParameter[2:] + '=' for strParameter in sys.argv[1::2]])[0]:
-    if strOption == '--model' and strArgument != '': arguments_strModel = strArgument # which model to use
-    if strOption == '--one' and strArgument != '': arguments_strOne = strArgument # path to the first frame
-    if strOption == '--two' and strArgument != '': arguments_strTwo = strArgument # path to the second frame
-    if strOption == '--video' and strArgument != '': arguments_strVideo = strArgument # path to a video
-    if strOption == '--out' and strArgument != '': arguments_strOut = strArgument # path to where the output should be stored
-# end
-
-##########################################################
 
 class Basic(torch.nn.Module):
     def __init__(self, strType:str, intChans:typing.List[int], objScratch:typing.Optional[typing.Dict]=None):
@@ -373,6 +357,8 @@ class Network(torch.nn.Module):
         self.netHorone = Basic('up(bilinear)-conv(3)-prelu(0.25)-conv(3)', [self.intChannels[1], self.intChannels[1], 51])
         self.netHortwo = Basic('up(bilinear)-conv(3)-prelu(0.25)-conv(3)', [self.intChannels[1], self.intChannels[1], 51])
 
+        arguments_strModel = 'paper'
+        
         self.load_state_dict(torch.hub.load_state_dict_from_url(url='http://content.sniklaus.com/resepconv/network-' + arguments_strModel + '.pytorch', file_name='resepconv-' + arguments_strModel))
     # end
 
@@ -442,12 +428,30 @@ def estimate(tenOne, tenTwo):
     tenPreprocessedOne = torch.nn.functional.pad(input=tenPreprocessedOne, pad=[0, intPadr, 0, intPadb], mode='replicate')
     tenPreprocessedTwo = torch.nn.functional.pad(input=tenPreprocessedTwo, pad=[0, intPadr, 0, intPadb], mode='replicate')
 
-    return netNetwork([tenPreprocessedOne, tenPreprocessedTwo])[0, :, :intHeight, :intWidth].cpu()
+    return netNetwork([tenPreprocessedOne, tenPreprocessedTwo])[0, :, :intHeight, :intWidth].cuda()
 # end
 
 ##########################################################
 
 if __name__ == '__main__':
+    ##########################################################
+
+    arguments_strModel = 'paper'
+    arguments_strOne = './images/one.png'
+    arguments_strTwo = './images/two.png'
+    arguments_strVideo = './videos/car-turn.mp4'
+    arguments_strOut = './out.png'
+
+    for strOption, strArgument in \
+    getopt.getopt(sys.argv[1:], '', [strParameter[2:] + '=' for strParameter in sys.argv[1::2]])[0]:
+        if strOption == '--model' and strArgument != '': arguments_strModel = strArgument  # which model to use
+        if strOption == '--one' and strArgument != '': arguments_strOne = strArgument  # path to the first frame
+        if strOption == '--two' and strArgument != '': arguments_strTwo = strArgument  # path to the second frame
+        if strOption == '--video' and strArgument != '': arguments_strVideo = strArgument  # path to a video
+        if strOption == '--out' and strArgument != '': arguments_strOut = strArgument  # path to where the output should be stored
+    # end
+
+    ##########################################################
     if arguments_strOut.split('.')[-1] in ['bmp', 'jpg', 'jpeg', 'png']:
         tenOne = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strOne))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
         tenTwo = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strTwo))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
