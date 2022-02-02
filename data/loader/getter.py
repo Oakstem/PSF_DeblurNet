@@ -2,8 +2,10 @@ import os
 
 from torch.utils.data import DataLoader, Dataset
 
-from data.loader.flow_dataset import FlowDataset
+from data.loader.datasets.test import Test
+from data.loader.datasets.monkaa import Monkaa
 from data.loader.params import DataLoaderParams
+from data.loader.type import Type
 
 
 class DataLoaderGetter:
@@ -11,14 +13,19 @@ class DataLoaderGetter:
     @staticmethod
     def get_by_params(data_loader_params: DataLoaderParams, train: bool):
         dataset_path = data_loader_params.root_path
-        if data_loader_params.dataset_name != "":
-            dataset_path = os.path.join(dataset_path, data_loader_params.dataset_name)
+        dataset_path = os.path.join(dataset_path, data_loader_params.type.value)
 
-        dataset: FlowDataset = FlowDataset(dataset_path, train, data_loader_params.input_size)
+        dataset: Dataset = None
+        if data_loader_params.type == Type.TEST:
+            dataset: Test = Test(dataset_path, train, data_loader_params.input_size)
+        if data_loader_params.type == Type.MONKAA:
+            dataset: Monkaa = Monkaa(dataset_path, data_loader_params.sub_type)
 
-        data_loader: DataLoader = DataLoader(dataset=dataset,
-                                             batch_size=data_loader_params.batch_size,
-                                             shuffle=data_loader_params.shuffle)
+        data_loader: DataLoader = None
+        if dataset is not None:
+            data_loader: DataLoader = DataLoader(dataset=dataset,
+                                                batch_size=data_loader_params.batch_size,
+                                                shuffle=data_loader_params.shuffle)
 
         return data_loader
 
