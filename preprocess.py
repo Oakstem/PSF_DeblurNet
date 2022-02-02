@@ -29,8 +29,12 @@ def get_interp_nb(flow_root: str, scene_name: str, img_name: str, min_nb:int=5, 
 
     dist = np.sqrt(of[..., 0]**2+of[..., 1]**2)
     step_sz = np.max(dist)
-    if step_sz > max_pxl_step:
+
+    # Temporary threshold:
+    if not 170 > step_sz > 100:
         return None, None
+    # if step_sz > max_pxl_step:
+    #     return None, None
     mx_flow = np.max((step_sz, min_nb))/scale_reduct
     if mx_flow <= 37:
         return 23, mx_flow
@@ -194,8 +198,6 @@ def get_filenames(root):
             file_list = [os.path.join(sub, f) for f in files]
             file_list.sort()
             res_list += [file_list]
-            if "family" in file_list[0]:
-              print(f"family index:{len(res_list)}")
             # if 'train' in sub:
             #     train_list += [file_list]
             # else:
