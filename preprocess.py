@@ -150,7 +150,7 @@ def apply_blur(root: str, start_scn_indx: int=0,
     print(f"Target_root:{target_root}")
     if target_root is None:
         return
-    move_2_left_dir(target_root)
+
     imgs_list, total_imgs = get_filenames(rgb_root)
 
     res_cnt = 0
