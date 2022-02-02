@@ -1,23 +1,10 @@
-import os
-
 from torch.utils.data import DataLoader
 
 from data.loader.getter import DataLoaderGetter
 from data.loader.params import DataLoaderParams
 from data.loader.sub_type import SubType
 from data.loader.type import Type
-from preprocess import apply_blur
 
-
-def main():
-    # PreProcess the images from the source Gopro Large dataset
-    # Adding convolutions with PSF
-    # abs_path should point where GOPRO_Large_all extracted folder is
-    # GOPRO_Large_all/
-    #   train/
-    #   test/
-    abs_path = os.path.abspath(os.path.join(os.curdir, "../deep-learning-flower-identifier/"))
-    apply_blur(abs_path)
 
 def load_data():
     root_path = "data/"
