@@ -105,15 +105,17 @@ def create_scene_dir(target_root: str, filename: str, idx: int):
         scene_name = filename.split("\\")[-3]
     print(f"scene_name:{scene_name}, index:{idx}")
     Path(os.path.join(target_root, scene_name)).mkdir(parents=True, exist_ok=True)
+    Path(os.path.join(target_root, f"{scene_name}/left")).mkdir(parents=True, exist_ok=True)
+    Path(os.path.join(target_root, f"{scene_name}/right")).mkdir(parents=True, exist_ok=True)
     return scene_name
 
 
-def get_blurred_img_path(target_root: str, scene_name: str, filename: str):
+def get_blurred_img_path(target_root: str, scene_name: str, filename: str, side: str):
     if len(filename.split("/")) > len(filename.split("\\")):
         img_name = filename.split("/")[-1]
     else:
         img_name = filename.split("\\")[-1]
-    blr_path = os.path.join(target_root, f"{scene_name}/{img_name}")
+    blr_path = os.path.join(target_root, f"{scene_name}/{side}/{img_name}")
     return blr_path, img_name
 
 
@@ -134,7 +136,7 @@ def apply_psf(cam: list, psfs: list, batch: torch.Tensor, nb_imgs: int, apply_ga
 
 
 def apply_blur(root: str, start_scn_indx: int=0,
-               target_sz: list = [270, 480], apply_gamma: bool=True):
+               target_sz: list = [270, 480], apply_gamma: bool=True, side: str ="right"):
     apply_resize = False
 
     nb_GT_in_batch = 2
@@ -148,7 +150,7 @@ def apply_blur(root: str, start_scn_indx: int=0,
     print(f"Target_root:{target_root}")
     if target_root is None:
         return
-
+    move_2_left_dir(target_root)
     imgs_list, total_imgs = get_filenames(rgb_root)
 
     res_cnt = 0
@@ -163,13 +165,13 @@ def apply_blur(root: str, start_scn_indx: int=0,
             img_pair = imgs_list[idx][idy:idy+nb_GT_in_batch]
 
             # Get blurred img path
-            blr_path, img_name = get_blurred_img_path(target_root, scene_name, img)
+            blr_path, img_name = get_blurred_img_path(target_root, scene_name, img, side)
 
             # Get the OF
             nb_imgs, mx_flow = get_interp_nb(flow_root, scene_name, img_name)
             max_flow_list.append(mx_flow)
 
-            if nb_imgs and len(img_pair) == 2:
+            if nb_imgs is not None and len(img_pair) == 2:
                 if device == torch.device("cuda"):
                     batch = get_interpolations(img_pair[0], img_pair[1], nb_imgs, Rsz, apply_gamma=True)
                 else:
@@ -206,6 +208,19 @@ def get_filenames(root):
     print(f"Total number of images to process:{total_imgs}")
 
     return res_list, total_imgs
+
+
+def move_2_left_dir(root):
+    for sub, dirs, files in os.walk(root):
+        # print(f"sub:{sub}, dirs:{dirs}, files:{files}")
+        if not dirs:
+            left_path = os.path.join(sub, "left")
+            # right_path = os.path.join(sub, "right")
+            Path(left_path).mkdir(parents=True, exist_ok=True)
+            # Path(right_path).mkdir(parents=True, exist_ok=True)
+            for file in files:
+                filepath = os.path.join(sub, file)
+                os.rename(filepath, os.path.join(left_path, file))
 
 
 def readPFM(file):
