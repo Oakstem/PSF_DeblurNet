@@ -23,20 +23,26 @@ def gamma(img: np.ndarray, gamm: float = 2.2):
     return torch.pow(img, gamm)
 
 
-def get_interp_nb(flow_root: str, scene_name: str, img_name: str, min_nb:int=5, max_pxl_step: int=100, scale_reduct: int=2):
+def get_interp_nb(flow_root: str, scene_name: str, img_name: str, side: str, min_nb:int=5, max_pxl_step: int=170, scale_reduct: int=2):
+    if side == "left":
+        lett = "L"
+    else:
+        lett = "R"
+        
     # Find L2 distance of flow movement, if within threshold, return number of frame interpolation
-    of_path = os.path.join(flow_root, scene_name, "into_future/left/OpticalFlowIntoFuture_" +
-                           img_name[:-4] + "_L.pfm")
-    of = read_pfm(of_path)[0]
+
+    of_path = os.path.join(flow_root, scene_name, f"into_future/{side}/OpticalFlowIntoFuture_{img_name[:-4]}_{lett}.pfm")
+    of = readPFM(of_path)[0]
+
 
     dist = np.sqrt(of[..., 0]**2+of[..., 1]**2)
     step_sz = np.max(dist)
 
     # Temporary threshold:
-    if not 170 > step_sz > 100:
-        return None, None
-    # if step_sz > max_pxl_step:
+    # if not 170 > step_sz > 100:
     #     return None, None
+    if step_sz > max_pxl_step:
+        return None, None
     mx_flow = np.max((step_sz, min_nb))/scale_reduct
     if mx_flow <= 37:
         return 23, mx_flow
@@ -153,7 +159,9 @@ def apply_blur(root: str, start_scn_indx: int=0,
     if target_root is None:
         return
 
-    imgs_list, total_imgs = get_filenames(rgb_root)
+
+    imgs_list, total_imgs = get_filenames(rgb_root, side)
+
 
     res_cnt = 0
     cnt_prev = 0
@@ -170,7 +178,7 @@ def apply_blur(root: str, start_scn_indx: int=0,
             blr_path, img_name = get_blurred_img_path(target_root, scene_name, img, side)
 
             # Get the OF
-            nb_imgs, mx_flow = get_interp_nb(flow_root, scene_name, img_name)
+            nb_imgs, mx_flow = get_interp_nb(flow_root, scene_name, img_name, side)
             max_flow_list.append(mx_flow)
 
             if nb_imgs is not None and len(img_pair) == 2:
@@ -193,12 +201,16 @@ def apply_blur(root: str, start_scn_indx: int=0,
                     t = time.time()
 
 
-def get_filenames(root):
+def get_filenames(root: str, side: str):
     res_list = []
     total_imgs = 0
+    if side == "right":
+        opp_side = "left"
+    else:
+        opp_side = "right"
     for sub, dirs, files in os.walk(root):
         # Discard the "right" dirs since no stereo is needed
-        if not dirs and "right" not in sub:
+        if not dirs and opp_side not in sub:
             file_list = [os.path.join(sub, f) for f in files]
             file_list.sort()
             res_list += [file_list]
