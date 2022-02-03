@@ -12,38 +12,70 @@ from torchvision.utils import save_image
 
 from data.loader.sub_type import SubType
 from utils import read_pfm
-import torch.nn.functional as nnf
-
 
 
 class Monkaa(Dataset):
-    def __init__(self, dataset_path: str, subtype: SubType):
+    BLURRED = "blurred"
+    OPTICAL_FLOW = "optical_flow"
+
+    def __init__(self, dataset_path: str, subtypes: [SubType]):
 
         # self.file_path = os.path.join(dataset_path, "train" if train else "test")
         self.file_path: str = dataset_path
-        self.subtype: SubType = subtype
         #self.file_path = os.path.join(self.file_path, '**/*')
 
-        self.files_blurred: [] = None
-        self.files_optical: [] = None
-        _, self.files_blurred = self.run_fast_scandir(self.file_path + "/blurred", [".png"])
-        _, self.files_optical = self.run_fast_scandir(self.file_path + "/optical_flow", [".pfm"])
+        files_blurred: [] = None
+        files_optical: [] = None
+        _, files_blurred = self.run_fast_scandir(self.file_path + "/" + self.BLURRED, [".png"])
+        _, files_optical = self.run_fast_scandir(self.file_path + "/" + self.OPTICAL_FLOW, [".pfm"])
 
+        files_blurred_filtered: [] = []
+        files_optical_filtered: [] = []
+        if SubType.FUTURE_LEFT in subtypes:
+            files_blurred_filtered += [k for k in files_blurred if 'left' in k]
+            files_optical_filtered += [k for k in files_optical if 'left' in k and 'into_future' in k]
+        if SubType.FUTURE_RIGHT in subtypes:
+            files_blurred_filtered += [k for k in files_blurred if 'right' in k]
+            files_optical_filtered += [k for k in files_optical if 'right' in k and 'into_future' in k]
+        if SubType.PAST_LEFT in subtypes:
+            files_blurred_filtered.append([k for k in files_blurred if 'left' in k])
+            files_optical_filtered.append([k for k in files_optical if 'left' in k and 'into_past' in k])
+        if SubType.PAST_RIGHT in subtypes:
+            files_blurred_filtered.append([k for k in files_blurred if 'right' in k])
+            files_optical_filtered.append([k for k in files_optical if 'right' in k and 'into_past' in k])
 
-        if subtype == SubType.FUTURE_LEFT:
-            self.files_blurred = [k for k in self.files_blurred if 'left' in k]
-            self.files_optical = [k for k in self.files_optical if 'left' in k and 'into_future' in k]
-        if subtype == SubType.FUTURE_RIGHT:
-            self.files_blurred = [k for k in self.files_blurred if 'right' in k]
-            self.files_optical = [k for k in self.files_optical if 'right' in k and 'into_future' in k]
-        if subtype == SubType.PAST_LEFT:
-            self.files_blurred = [k for k in self.files_blurred if 'left' in k]
-            self.files_optical = [k for k in self.files_optical if 'left' in k and 'into_past' in k]
-        if subtype == SubType.Past_RIGHT:
-            self.files_blurred = [k for k in self.files_blurred if 'right' in k]
-            self.files_optical = [k for k in self.files_optical if 'right' in k and 'into_past' in k]
+        files_optical_dict = {}
+        for file_optical in files_optical_filtered:
+            files_optical_dict[file_optical] = file_optical
 
-        # self.samplec = len(subfolders)
+        files_blurred_dict = {}
+        file_blurred: str = ""
+        for file_blurred in files_blurred_filtered:
+            file_blurred_path_remainder: str = file_blurred.replace(self.file_path + "/" + self.BLURRED + "/", "")
+            file_blurred_path_remainder_list = file_blurred_path_remainder.split("/")
+            scene_name: str = file_blurred_path_remainder_list[0]
+            camera_time: str = file_blurred_path_remainder_list[1]
+            camera_side: str = file_blurred_path_remainder_list[2]
+            camera_side_first_letter: str = camera_side[0].upper()
+            file_name: str = file_blurred_path_remainder_list[3]
+            file_name_no_extention: str = file_name.split(".")[0]
+
+            file_optical_path_to_search = self.file_path + "/" + \
+                                          self.OPTICAL_FLOW + "/" + \
+                                          scene_name + "/" + \
+                                          camera_time + "/" + \
+                                          camera_side + "/" + \
+                                          "OpticalFlowIntoFuture_" + \
+                                          file_name_no_extention + "_" + \
+                                          camera_side_first_letter + ".pfm"
+
+            if file_optical_path_to_search in files_optical_dict:
+                files_blurred_dict[file_blurred] = file_optical_path_to_search
+
+        self.files_blurred: [] = list(files_blurred_dict.keys())
+        self.files_optical: [] = list(files_blurred_dict.values())
+
+        # print("aa")
 
     def __len__(self):
         return len(self.files_blurred)
@@ -61,15 +93,6 @@ class Monkaa(Dataset):
             [transforms.ToTensor(), transforms.CenterCrop(image_blurred_height)])
         image_blurred_tensor: Tensor = transform(image_blurred)
 
-
-
-        #from PIL import Image
-        #im = Image.fromarray(image_blurred)
-        #im.save("data/loader/datasets/your_file1.png")
-        # image_blurred = self.normalize_in_place(image_blurred)
-        # im = Image.fromarray(image_blurred)
-        # im.save("data/loader/datasets/your_file2.png")
-
         transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Resize((image_blurred_height, image_blurred_width)),
@@ -78,34 +101,7 @@ class Monkaa(Dataset):
         image_optical_path = self.files_optical[index]
         image_optical: ndarray = read_pfm(image_optical_path)[0]
         image_optical = st.resize(image_optical, (image_blurred_height, image_blurred_width))
-        # image_optical = Image.fromarray((image_optical * 255).astype(np.uint8))
-        # image_optical_tensor: Tensor = transforms.ToTensor()(image_optical).unsqueeze_(0)
         image_optical_tensor: Tensor = transform(image_optical)
-
-
-        # save_image(image_optical_tensor, "data/loader/datasets/your_file4.png")
-        #image_blurred_tensor: Tensor = torch.tensor(image_blurred, dtype=torch.float32).permute(2, 0, 1)
-        #save_image(image_blurred_tensor, "data/loader/datasets/your_file2.png")
-        #tmp_img = torch.tensor(read_pfm(image_optical_path)[0], device='cpu').permute(2, 0, 1)
-        #save_image(tmp_img, "data/loader/datasets/your_file5.png")
-
-        # im = Image.fromarray(image_optical)
-        # im.save("data/loader/datasets/your_file3.png")
-        #
-        # image_optical = np.random.random_sample(image_optical.shape) * 255
-        # image_optical = image_optical.astype(np.float)
-        # #im = Image.fromarray(image_optical)
-        # #im.save("data/loader/datasets/your_file3.png")
-        #
-        # image_optical_tensor: Tensor = transform_to_tensor(image_optical)
-        # transform_resize = transforms.Resize(image_blurred_width, image_blurred_height)
-        # image_optical_tensor = transform_resize(image_blurred_tensor)
-        # #save_image(image_optical_tensor, "data/loader/datasets/your_file4.png")
-        # # image_optical = cv2.resize(image_optical, dsize=(54, 140), interpolation=cv2.INTER_CUBIC)
-        # #image_optical = self.normalize_in_place(image_optical)
-        # #image_optical_tensor: Tensor = torch.tensor(image_optical, dtype=torch.float32).permute(2, 0, 1)
-        # #out = nnf.interpolate(image_optical_tensor, size=(image_blurred_width, image_blurred_height), mode='bicubic', align_corners=False)
-        # #save_image(im, 'data/datasets/im_name.png')
 
         return image_blurred_tensor, image_optical_tensor
 
@@ -132,14 +128,9 @@ class Monkaa(Dataset):
             subfolders.extend(subfolders_folders)
             files.extend(subfolders_files)
 
-        # if folder_files_num == len(files):
         files.extend(folder_files)
 
         return subfolders, files
-
-    @staticmethod
-    def normalize_in_place(x):
-        return np.array(np.array(x, dtype=np.float32), dtype=np.float32) / 128.0 - 1.0
 
 
 
