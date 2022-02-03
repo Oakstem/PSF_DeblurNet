@@ -8,6 +8,8 @@ from data.IMPROVE_camera_model import camera_model
 from torchvision.transforms import Resize
 from torchvision import transforms
 
+from utils import read_pfm
+
 if torch.cuda.is_available():
     # from interp import get_interpolations
     from interpolations.interpolations import get_interpolations
@@ -28,8 +30,10 @@ def get_interp_nb(flow_root: str, scene_name: str, img_name: str, side: str, min
         lett = "R"
         
     # Find L2 distance of flow movement, if within threshold, return number of frame interpolation
+
     of_path = os.path.join(flow_root, scene_name, f"into_future/{side}/OpticalFlowIntoFuture_{img_name[:-4]}_{lett}.pfm")
     of = readPFM(of_path)[0]
+
 
     dist = np.sqrt(of[..., 0]**2+of[..., 1]**2)
     step_sz = np.max(dist)
@@ -77,8 +81,8 @@ def interp_frames(i1, i2, nb_interp):
 
 
 def find_flow(imgs, device):
-    # tmp_img = torch.tensor(readPFM(imgs[0]), device=device)
-    tmp_img = torch.tensor([readPFM(im)[0] for im in imgs], device=device).permute(0,3,1,2)
+    # tmp_img = torch.tensor(read_pfm(imgs[0]), device=device)
+    tmp_img = torch.tensor([read_pfm(im)[0] for im in imgs], device=device).permute(0,3,1,2)
     xvec = torch.tensor(np.arange(0, tmp_img[0].shape[2]), device=device)
     yvec = torch.tensor(np.arange(0, tmp_img[0].shape[1]), device=device)
     x_coord, y_coord = np.meshgrid(xvec, yvec)
@@ -155,7 +159,9 @@ def apply_blur(root: str, start_scn_indx: int=0,
     if target_root is None:
         return
 
+
     imgs_list, total_imgs = get_filenames(rgb_root, side)
+
 
     res_cnt = 0
     cnt_prev = 0
@@ -229,41 +235,3 @@ def move_2_left_dir(root):
             for file in files:
                 filepath = os.path.join(sub, file)
                 os.rename(filepath, os.path.join(left_path, file))
-
-
-def readPFM(file):
-    file = open(file, 'rb')
-
-    color = None
-    width = None
-    height = None
-    scale = None
-    endian = None
-
-    header = file.readline().rstrip()
-    if header.decode("ascii") == 'PF':
-        color = True
-    elif header.decode("ascii") == 'Pf':
-        color = False
-    else:
-        raise Exception('Not a PFM file.')
-
-    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline().decode("ascii"))
-    if dim_match:
-        width, height = list(map(int, dim_match.groups()))
-    else:
-        raise Exception('Malformed PFM header.')
-
-    scale = float(file.readline().decode("ascii").rstrip())
-    if scale < 0: # little-endian
-        endian = '<'
-        scale = -scale
-    else:
-        endian = '>' # big-endian
-
-    data = np.fromfile(file, endian + 'f')
-    shape = (height, width, 3) if color else (height, width)
-
-    data = np.reshape(data, shape)
-    data = np.flipud(data)
-    return data, scale
