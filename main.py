@@ -1,4 +1,5 @@
 import os
+import torch
 import argparse
 from preprocess import apply_blur
 from load_data import load_data
@@ -17,10 +18,10 @@ def main():
     parser.add_argument('--sz', default=[270, 480], type=list, help='Target image size')
     args = parser.parse_args()
 
-
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
     data_path = os.path.join(abs_path, "Monkaa")
-    load_data(abs_path)
+    train_dataloader = load_data(abs_path, device)
     apply_blur(abs_path, start_scn_indx=args.start_indx, apply_gamma=args.gamm, target_sz=args.sz)
 
 if __name__ == "__main__":

@@ -52,12 +52,16 @@ class Monkaa(Dataset):
 
         image_blurred_path = self.files_blurred[index]
         image_blurred: ndarray = self.load_image(image_blurred_path)
-        transform_to_tensor = transforms.ToTensor()
-        image_blurred_tensor: Tensor = transform_to_tensor(image_blurred)
 
         image_blurred_height = image_blurred.shape[0]
         image_blurred_width = image_blurred.shape[1]
         image_blurred_channels = image_blurred.shape[2]
+
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.CenterCrop(image_blurred_height)])
+        image_blurred_tensor: Tensor = transform(image_blurred)
+
+
 
         #from PIL import Image
         #im = Image.fromarray(image_blurred)
@@ -68,7 +72,8 @@ class Monkaa(Dataset):
 
         transform = transforms.Compose(
             [transforms.ToTensor(),
-             transforms.Resize((image_blurred_height, image_blurred_width))])
+             transforms.Resize((image_blurred_height, image_blurred_width)),
+             transforms.CenterCrop(image_blurred_height)])
 
         image_optical_path = self.files_optical[index]
         image_optical: ndarray = read_pfm(image_optical_path)[0]
