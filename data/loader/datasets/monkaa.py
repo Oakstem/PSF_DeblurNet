@@ -29,17 +29,18 @@ class Monkaa(Dataset):
         _, self.files_blurred = self.run_fast_scandir(self.file_path + "/blurred", [".png"])
         _, self.files_optical = self.run_fast_scandir(self.file_path + "/optical_flow", [".pfm"])
 
+
         if subtype == SubType.FUTURE_LEFT:
-            self.files_blurred = [k for k in self.files_blurred if 'left' in k and 'into_future' in k]
+            self.files_blurred = [k for k in self.files_blurred if 'left' in k]
             self.files_optical = [k for k in self.files_optical if 'left' in k and 'into_future' in k]
         if subtype == SubType.FUTURE_RIGHT:
-            self.files_blurred = [k for k in self.files_blurred if 'right' in k and 'into_future' in k]
+            self.files_blurred = [k for k in self.files_blurred if 'right' in k]
             self.files_optical = [k for k in self.files_optical if 'right' in k and 'into_future' in k]
         if subtype == SubType.PAST_LEFT:
-            self.files_blurred = [k for k in self.files_blurred if 'left' in k and 'into_past' in k]
+            self.files_blurred = [k for k in self.files_blurred if 'left' in k]
             self.files_optical = [k for k in self.files_optical if 'left' in k and 'into_past' in k]
         if subtype == SubType.Past_RIGHT:
-            self.files_blurred = [k for k in self.files_blurred if 'right' in k and 'into_past' in k]
+            self.files_blurred = [k for k in self.files_blurred if 'right' in k]
             self.files_optical = [k for k in self.files_optical if 'right' in k and 'into_past' in k]
 
         # self.samplec = len(subfolders)
@@ -65,11 +66,17 @@ class Monkaa(Dataset):
         # im = Image.fromarray(image_blurred)
         # im.save("data/loader/datasets/your_file2.png")
 
+        transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Resize((image_blurred_height, image_blurred_width))])
+
         image_optical_path = self.files_optical[index]
         image_optical: ndarray = read_pfm(image_optical_path)[0]
         image_optical = st.resize(image_optical, (image_blurred_height, image_blurred_width))
-        image_optical = Image.fromarray((image_optical * 255).astype(np.uint8))
-        image_optical_tensor: Tensor = transforms.ToTensor()(image_optical).unsqueeze_(0)
+        # image_optical = Image.fromarray((image_optical * 255).astype(np.uint8))
+        # image_optical_tensor: Tensor = transforms.ToTensor()(image_optical).unsqueeze_(0)
+        image_optical_tensor: Tensor = transform(image_optical)
+
 
         # save_image(image_optical_tensor, "data/loader/datasets/your_file4.png")
         #image_blurred_tensor: Tensor = torch.tensor(image_blurred, dtype=torch.float32).permute(2, 0, 1)
@@ -120,8 +127,8 @@ class Monkaa(Dataset):
             subfolders.extend(subfolders_folders)
             files.extend(subfolders_files)
 
-        if folder_files_num == len(files_extentions):
-            files.extend(folder_files)
+        # if folder_files_num == len(files):
+        files.extend(folder_files)
 
         return subfolders, files
 

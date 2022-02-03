@@ -1,7 +1,7 @@
 import os
 import argparse
 from preprocess import apply_blur
-
+from load_data import load_data
 
 def main():
     # PreProcess the images from the source Gopro Large dataset
@@ -16,7 +16,11 @@ def main():
     parser.add_argument('--gamm', '-g', action='store_true', help='Choose whether to apply gamma')
     parser.add_argument('--sz', default=[270, 480], type=list, help='Target image size')
     args = parser.parse_args()
+
+
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
+    data_path = os.path.join(abs_path, "Monkaa")
+    load_data(abs_path)
     apply_blur(abs_path, start_scn_indx=args.start_indx, apply_gamma=args.gamm, target_sz=args.sz)
 
 if __name__ == "__main__":
