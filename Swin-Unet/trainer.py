@@ -134,7 +134,8 @@ def trainer_monkaa(args, model, snapshot_path, device):
     # ce_loss = CrossEntropyLoss()
     # dice_loss = DiceLoss(num_classes)
     l1loss = SmoothL1Loss()
-    optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+    # optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
     writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
     max_epoch = args.max_epochs

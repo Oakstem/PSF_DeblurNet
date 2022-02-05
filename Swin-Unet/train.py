@@ -28,7 +28,7 @@ parser.add_argument('--batch_size', type=int,
 parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
 parser.add_argument('--deterministic', type=int,  default=1,
                     help='whether use deterministic training')
-parser.add_argument('--base_lr', type=float,  default=0.01,
+parser.add_argument('--base_lr', type=float,  default=0.001,
                     help='segmentation network learning rate')
 parser.add_argument('--img_size', type=int,
                     default=270, help='input patch size of network input')
@@ -93,8 +93,8 @@ if __name__ == "__main__":
         }
     }
 
-    if args.batch_size != 24 and args.batch_size % 6 == 0:
-        args.base_lr *= args.batch_size / 24
+    # if args.batch_size != 24 and args.batch_size % 6 == 0:
+    #     args.base_lr *= args.batch_size / 24
     args.num_classes = dataset_config[dataset_name]['num_classes']
     args.root_path = dataset_config[dataset_name]['root_path']
     args.list_dir = dataset_config[dataset_name]['list_dir']
