@@ -118,7 +118,7 @@ def trainer_monkaa(args, model, snapshot_path, device):
 
     # trainloader = DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,
     #                          worker_init_fn=worker_init_fn)
-    trainloader = load_data(args.root_path, device)
+    trainloader = load_data(args.root_path, args.batch_size)
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import os.path
 
 import cv2
@@ -23,14 +24,14 @@ class Monkaa(Dataset):
         # self.file_path = os.path.join(dataset_path, "train" if train else "test")
         self.file_path: str = dataset_path
 
-        self.subtype: SubType = subtype
+        self.subtype: SubType = subtypes
         self.img_size = 224
 
-
+        slash = "\\" if os.name == "nt" else "/"
         files_blurred: [] = None
         files_optical: [] = None
-        _, files_blurred = self.run_fast_scandir(self.file_path + "/" + self.BLURRED, [".png"])
-        _, files_optical = self.run_fast_scandir(self.file_path + "/" + self.OPTICAL_FLOW, [".pfm"])
+        _, files_blurred = self.run_fast_scandir(self.file_path + slash + self.BLURRED, [".png"])
+        _, files_optical = self.run_fast_scandir(self.file_path + slash + self.OPTICAL_FLOW, [".pfm"])
 
         files_blurred_filtered: [] = []
         files_optical_filtered: [] = []
@@ -53,21 +54,27 @@ class Monkaa(Dataset):
 
         files_blurred_dict = {}
         file_blurred: str = ""
+        camera_time: str = "into_future"
         for file_blurred in files_blurred_filtered:
-            file_blurred_path_remainder: str = file_blurred.replace(self.file_path + "/" + self.BLURRED + "/", "")
-            file_blurred_path_remainder_list = file_blurred_path_remainder.split("/")
+            file_blurred_path_remainder: str = file_blurred.replace(self.file_path + slash + self.BLURRED + slash, "")
+            file_blurred_path_remainder_list = file_blurred_path_remainder.split(slash)
             scene_name: str = file_blurred_path_remainder_list[0]
-            camera_time: str = file_blurred_path_remainder_list[1]
-            camera_side: str = file_blurred_path_remainder_list[2]
-            camera_side_first_letter: str = camera_side[0].upper()
-            file_name: str = file_blurred_path_remainder_list[3]
+            if file_blurred_path_remainder_list[1] == "into_future" or file_blurred_path_remainder_list[1] == "into_past":
+                camera_time: str = file_blurred_path_remainder_list[1]
+                camera_side: str = file_blurred_path_remainder_list[2]
+                camera_side_first_letter: str = camera_side[0].upper()
+                file_name: str = file_blurred_path_remainder_list[3]
+            else:
+                camera_side: str = file_blurred_path_remainder_list[1]
+                camera_side_first_letter: str = camera_side[0].upper()
+                file_name: str = file_blurred_path_remainder_list[2]
             file_name_no_extention: str = file_name.split(".")[0]
 
-            file_optical_path_to_search = self.file_path + "/" + \
-                                          self.OPTICAL_FLOW + "/" + \
-                                          scene_name + "/" + \
-                                          camera_time + "/" + \
-                                          camera_side + "/" + \
+            file_optical_path_to_search = self.file_path + slash + \
+                                          self.OPTICAL_FLOW + slash + \
+                                          scene_name + slash + \
+                                          camera_time + slash + \
+                                          camera_side + slash + \
                                           "OpticalFlowIntoFuture_" + \
                                           file_name_no_extention + "_" + \
                                           camera_side_first_letter + ".pfm"

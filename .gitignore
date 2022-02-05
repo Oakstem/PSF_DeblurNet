@@ -116,7 +116,7 @@ dmypy.json
 *.iml
 *.png
 
-
+backup/
 ABME/
 Swin-Unet/backup
 Swin-Unet/lists
