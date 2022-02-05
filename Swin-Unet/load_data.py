@@ -15,7 +15,7 @@ def load_data(path, batch_size):
     sub_type_right: SubType = SubType.FUTURE_RIGHT
     data_loader_params: DataLoaderParams = \
         DataLoaderParams(root_path=root_path, type=type, sub_types = [sub_type_left, sub_type_right],
-                         batch_size=batch_size, shuffle=False)
+                         batch_size=batch_size, shuffle=True)
 
     train_loader: DataLoader = DataLoaderGetter.get_by_params(data_loader_params, train=True)
 

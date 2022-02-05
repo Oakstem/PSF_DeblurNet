@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.utils import save_image
 
-from data.loader.sub_type import SubType
+from ..sub_type import SubType
 from utils import read_pfm
 
 
