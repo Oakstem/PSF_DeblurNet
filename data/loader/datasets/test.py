@@ -7,14 +7,12 @@ from torch.utils.data import Dataset
 
 
 class Test(Dataset):
-    def __init__(self, dataset_path: str, train: bool, image_size: tuple ):
+    def __init__(self, dataset_path: str, train: bool):
 
         self.train = train
         # self.file_path = os.path.join(dataset_path, "train" if train else "test")
         self.file_path = dataset_path
         #self.file_path = os.path.join(self.file_path, '**/*')
-
-        self.image_size: tuple = image_size
 
         self.sub_folders, self.files = self.run_fast_scandir(self.file_path, ["1.png", "2.png"])
 

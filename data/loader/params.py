@@ -3,12 +3,10 @@ from data.loader.type import Type
 
 
 class DataLoaderParams:
-    def __init__(self, type: Type, sub_type: SubType, root_path: str, input_size: tuple,
-                 batch_size: int, shuffle: bool = False, device: int or str = 'cpu'):
+    def __init__(self, type: Type, sub_types: [SubType], root_path: str,
+                 batch_size: int, shuffle: bool = False):
         self.type: Type = type
-        self.sub_type: SubType = sub_type
+        self.sub_types: SubType = sub_types
         self.root_path: str = root_path
-        self.input_size: tuple = input_size
         self.batch_size: int = batch_size
         self.shuffle: bool = shuffle
-        self.device: int or str = device
