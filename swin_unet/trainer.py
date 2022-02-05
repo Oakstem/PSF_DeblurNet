@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from utils import DiceLoss
 from torchvision import transforms
-from load_data import load_data
+from data.load_data import load_data
 
 
 def trainer_synapse(args, model, snapshot_path):

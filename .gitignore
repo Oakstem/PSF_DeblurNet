@@ -118,9 +118,9 @@ dmypy.json
 
 backup/
 ABME/
-Swin-Unet/backup
-Swin-Unet/lists
-Swin-Unet/datasets
-Swin-Unet/outputs
+swin_unet/backup
+swin_unet/lists
+swin_unet/datasets
+swin_unet/outputs
 *.pth
 *.sh
