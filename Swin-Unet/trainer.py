@@ -98,13 +98,22 @@ def trainer_synapse(args, model, snapshot_path):
     return "Training Finished!"
 
 
+def tv_loss(y: torch.Tensor):
+    regularization = 1
+    total_variation_loss = regularization*(torch.mean(torch.abs(y[:, :, :, :-1] - y[:, :, :, 1:])) + torch.mean(torch.abs(y[:, :, :-1, :] - y[:, :, 1:, :])).item())
+    return total_variation_loss
+
+
 def trainer_monkaa(args, model, snapshot_path, device):
     # from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
+    print(f"Training on:{device}")
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.info(str(args))
     base_lr = args.base_lr
+    l1w = 0.7
+    ltvw = 1. - l1w
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
@@ -141,9 +150,11 @@ def trainer_monkaa(args, model, snapshot_path, device):
             # loss_ce = ce_loss(outputs, label_batch[:].long())
             # loss_dice = dice_loss(outputs, label_batch, softmax=True)
             # loss = 0.4 * loss_ce + 0.6 * loss_dice
-            loss = l1loss(outputs, label_batch)
+            tv_loss_batch = tv_loss(outputs)
+            l1loss_batch = l1loss(outputs, label_batch)
+            loss_batch = l1w*l1loss_batch + ltvw*tv_loss_batch
             optimizer.zero_grad()
-            loss.backward()
+            loss_batch.backward()
             optimizer.step()
             lr_ = base_lr * (1.0 - iter_num / max_iterations) ** 0.9
             for param_group in optimizer.param_groups:
@@ -151,10 +162,11 @@ def trainer_monkaa(args, model, snapshot_path, device):
 
             iter_num = iter_num + 1
             writer.add_scalar('info/lr', lr_, iter_num)
-            writer.add_scalar('info/total_loss', loss, iter_num)
-            # writer.add_scalar('info/loss_ce', loss_ce, iter_num)
+            writer.add_scalar('info/total_loss', loss_batch, iter_num)
+            writer.add_scalar('info/loss_tv', tv_loss_batch, iter_num)
 
-            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+            logging.info('iteration %d : loss : %f L1_loss : %f TV_loss : %f' %
+                         (iter_num, loss_batch.item(), l1loss_batch.item(), tv_loss_batch.item()))
 
             # if iter_num % 20 == 0:
             #     image = image_batch[1, 0:1, :, :]
@@ -165,7 +177,7 @@ def trainer_monkaa(args, model, snapshot_path, device):
             #     labs = label_batch[1, ...].unsqueeze(0) * 50
             #     writer.add_image('train/GroundTruth', labs, iter_num)
 
-        save_interval = 50  # int(max_epoch/6)
+        save_interval = 5  # int(max_epoch/6)
         if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
             save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
             torch.save(model.state_dict(), save_mode_path)
