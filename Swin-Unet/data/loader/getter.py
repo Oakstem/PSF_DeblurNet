@@ -2,10 +2,10 @@ import os
 
 from torch.utils.data import DataLoader, Dataset
 
-from datasets.test import Test
-from datasets.monkaa import Monkaa
-from params import DataLoaderParams
-from type import Type
+from .datasets.test import Test
+from .datasets.monkaa import Monkaa
+from .params import DataLoaderParams
+from .type import Type
 
 
 class DataLoaderGetter:

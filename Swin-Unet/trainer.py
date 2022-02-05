@@ -1,10 +1,7 @@
-import argparse
 import logging
 import os
 import random
 import sys
-import time
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,7 +12,7 @@ from tqdm import tqdm
 from utils import DiceLoss
 from torchvision import transforms
 from load_data import load_data
-from utils import test_single_volume
+
 
 def trainer_synapse(args, model, snapshot_path):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
