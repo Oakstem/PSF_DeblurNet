@@ -19,7 +19,9 @@ class Monkaa(Dataset):
     BLURRED = "blurred"
     OPTICAL_FLOW = "optical_flow"
 
-    def __init__(self, dataset_path: str, subtypes: [SubType]):
+    TEST_PERCENTAGE = 10
+
+    def __init__(self, dataset_path: str, subtypes: [SubType], train: bool):
 
         # self.file_path = os.path.join(dataset_path, "train" if train else "test")
         self.file_path: str = dataset_path
@@ -53,6 +55,8 @@ class Monkaa(Dataset):
             files_optical_dict[file_optical] = file_optical
 
         files_blurred_dict = {}
+        folders_blurred_dict = {}
+        folders_optical_dict = {}
         file_blurred: str = ""
         camera_time: str = "into_future"
         for file_blurred in files_blurred_filtered:
@@ -82,10 +86,51 @@ class Monkaa(Dataset):
             if file_optical_path_to_search in files_optical_dict:
                 files_blurred_dict[file_blurred] = file_optical_path_to_search
 
+                file_blurred_folder: str = self.file_path + slash + \
+                                           self.BLURRED + slash + \
+                                           scene_name + slash + \
+                                           camera_time + slash + \
+                                           camera_side + slash
+
+                if file_blurred_folder not in folders_blurred_dict:
+                    folders_blurred_dict[file_blurred_folder] = []
+
+                folders_blurred_dict[file_blurred_folder].append(file_blurred)
+
+                file_optical_folder: str = self.file_path + slash + \
+                                           self.OPTICAL_FLOW + slash + \
+                                           scene_name + slash + \
+                                           camera_time + slash + \
+                                           camera_side + slash
+
+                if file_optical_folder not in folders_optical_dict:
+                    folders_optical_dict[file_optical_folder] = []
+
+                folders_optical_dict[file_optical_folder].append(file_optical_path_to_search)
+
+        for folder_blurred in folders_blurred_dict.keys():
+            folder_blurred_files = folders_blurred_dict[folder_blurred]
+
+            total_num_of_files = len(folder_blurred_files)
+            test_files_num = total_num_of_files * self.TEST_PERCENTAGE // 100
+            train_files_num = total_num_of_files - test_files_num
+
+            blurred_files_to_remove: [] = []
+            optical_files_to_remove: [] = []
+            if train:
+                blurred_files_to_remove = folder_blurred_files[-test_files_num:]
+            else:
+                blurred_files_to_remove = folder_blurred_files[:train_files_num]
+
+            for blurred_file_to_remove in blurred_files_to_remove:
+                del files_blurred_dict[blurred_file_to_remove]
+
+            print(folder_blurred + ": Train " + str(train_files_num) + ", Test: " + str(test_files_num))
+
         self.files_blurred: [] = list(files_blurred_dict.keys())
         self.files_optical: [] = list(files_blurred_dict.values())
 
-        # print("aa")
+        print("aa")
 
     def __len__(self):
         return len(self.files_blurred)

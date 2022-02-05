@@ -21,7 +21,9 @@ def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
     data_path = os.path.join(abs_path, "Monkaa")
-    train_dataloader = load_data(abs_path, 5)
+    train_dataloader = load_data(abs_path, batch_size=5, train=True)
+    test_dataloader = load_data(abs_path, batch_size=5, train=False)
+
     apply_blur(abs_path, start_scn_indx=args.start_indx, apply_gamma=args.gamm, target_sz=args.sz)
 
 if __name__ == "__main__":

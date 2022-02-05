@@ -8,7 +8,7 @@ from loader.sub_type import SubType
 from loader.type import Type
 
 
-def load_data(path, batch_size):
+def load_data(path: str, batch_size: int, train: bool):
     root_path = path
     type: Type = Type.MONKAA
     sub_type_left: SubType = SubType.FUTURE_LEFT
@@ -17,7 +17,7 @@ def load_data(path, batch_size):
         DataLoaderParams(root_path=root_path, type=type, sub_types = [sub_type_left, sub_type_right],
                          batch_size=batch_size, shuffle=True)
 
-    train_loader: DataLoader = DataLoaderGetter.get_by_params(data_loader_params, train=True)
+    train_loader: DataLoader = DataLoaderGetter.get_by_params(data_loader_params, train=train)
 
     #it = iter(train_loader)
     #dl_length = len(train_loader)
@@ -30,5 +30,8 @@ def load_data(path, batch_size):
 
 if __name__ == "__main__":
     data_dir = os.path.abspath(os.path.join(os.curdir, "data"))
-    load_data(data_dir, 1)
+    data_dir = "/home/jupyter"
+
+    load_data(data_dir, batch_size=1, train=True)
+    load_data(data_dir, batch_size=1, train=False)
 

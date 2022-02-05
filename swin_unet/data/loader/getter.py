@@ -19,7 +19,7 @@ class DataLoaderGetter:
         if data_loader_params.type == Type.TEST:
             dataset: Test = Test(dataset_path, train)
         if data_loader_params.type == Type.MONKAA:
-            dataset: Monkaa = Monkaa(dataset_path, data_loader_params.sub_types)
+            dataset: Monkaa = Monkaa(dataset_path, data_loader_params.sub_types, train)
 
         data_loader: DataLoader = None
         if dataset is not None:
