@@ -7,3 +7,7 @@ medpy
 SimpleITK
 scipy
 h5py
+einops
+timm
+opencv-python
+yacs
