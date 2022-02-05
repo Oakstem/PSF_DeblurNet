@@ -22,7 +22,7 @@ class Monkaa(Dataset):
         # self.file_path = os.path.join(dataset_path, "train" if train else "test")
         self.file_path: str = dataset_path
         self.subtype: SubType = subtype
-        #self.file_path = os.path.join(self.file_path, '**/*')
+        self.img_size = 224
 
         self.files_blurred: [] = None
         self.files_optical: [] = None
@@ -58,7 +58,7 @@ class Monkaa(Dataset):
         image_blurred_channels = image_blurred.shape[2]
 
         transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.CenterCrop(image_blurred_height)])
+            [transforms.ToTensor(), transforms.CenterCrop(image_blurred_height), transforms.Resize((self.img_size))])
         image_blurred_tensor: Tensor = transform(image_blurred)
 
 
@@ -73,10 +73,10 @@ class Monkaa(Dataset):
         transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Resize((image_blurred_height, image_blurred_width)),
-             transforms.CenterCrop(image_blurred_height)])
+             transforms.CenterCrop(image_blurred_height), transforms.Resize(self.img_size)])
 
         image_optical_path = self.files_optical[index]
-        image_optical: ndarray = read_pfm(image_optical_path)[0]
+        image_optical: ndarray = read_pfm(image_optical_path)[0][..., :2]
         image_optical = st.resize(image_optical, (image_blurred_height, image_blurred_width))
         # image_optical = Image.fromarray((image_optical * 255).astype(np.uint8))
         # image_optical_tensor: Tensor = transforms.ToTensor()(image_optical).unsqueeze_(0)

@@ -115,4 +115,12 @@ dmypy.json
 *.xml
 *.iml
 *.png
+
+
 ABME/
+Swin-Unet/backup
+Swin-Unet/lists
+Swin-Unet/datasets
+Swin-Unet/outputs
+*.pth
+*.sh

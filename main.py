@@ -2,7 +2,7 @@ import os
 import torch
 import argparse
 from preprocess import apply_blur
-from load_data import load_data
+
 
 def main():
     # PreProcess the images from the source Gopro Large dataset
