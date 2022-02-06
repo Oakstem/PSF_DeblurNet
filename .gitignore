@@ -118,9 +118,13 @@ dmypy.json
 
 backup/
 ABME/
-swin_unet/backup
-swin_unet/lists
-swin_unet/datasets
-swin_unet/outputs
+Swin_Unet/backup
+Swin_Unet/datasets
+Swin_Unet/outputs
+Swin_Unet/lists
 *.pth
 *.sh
+*.DESKTOP-BGMRBPK
+*.lst
+Swin-Unet/lists/lists_Synapse/test_vol.txt
+Swin-Unet/lists/lists_Synapse/train.txt
