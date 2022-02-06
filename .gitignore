@@ -128,3 +128,4 @@ Swin_Unet/lists
 *.lst
 Swin-Unet/lists/lists_Synapse/test_vol.txt
 Swin-Unet/lists/lists_Synapse/train.txt
+Swin-Unet/outputs/log.txt

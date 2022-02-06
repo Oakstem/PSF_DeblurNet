@@ -158,7 +158,7 @@ class Monkaa(Dataset):
         image_optical = st.resize(image_optical, (image_blurred_height, image_blurred_width))
         image_optical_tensor: Tensor = transform(image_optical)
 
-        return image_blurred_tensor, image_optical_tensor
+        return image_blurred_tensor, image_optical_tensor, index
 
     def load_image(self, image_path):
         image = cv2.imread(image_path, 1)

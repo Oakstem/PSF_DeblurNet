@@ -124,8 +124,8 @@ def trainer_monkaa(args, model, snapshot_path, device):
 
     # trainloader = DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,
     #                          worker_init_fn=worker_init_fn)
-    trainloader = load_data(args.root_path, args.batch_size, train=True)
-    testloader = load_data(args.root_path, args.batch_size, train=False)
+    trainloader = load_data(args.root_path, args.batch_size, train=True, shuffle=args.shuffle)
+    testloader = load_data(args.root_path, args.batch_size, train=False, shuffle=args.shuffle)
 
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
@@ -133,7 +133,8 @@ def trainer_monkaa(args, model, snapshot_path, device):
     # ce_loss = CrossEntropyLoss()
     # dice_loss = DiceLoss(num_classes)
     l1loss = SmoothL1Loss()
-    optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+    # optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
     writer = SummaryWriter(snapshot_path + '/log')
     iter_num = 0
     max_epoch = args.max_epochs
@@ -143,7 +144,7 @@ def trainer_monkaa(args, model, snapshot_path, device):
     iterator = tqdm(range(max_epoch), ncols=70)
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
-            image_batch, label_batch = sampled_batch[0], sampled_batch[1]
+            image_batch, label_batch, idxs = sampled_batch[0], sampled_batch[1], sampled_batch[2]
             image_batch, label_batch = image_batch.to(device), label_batch.to(device)
             outputs = model(image_batch)
             # loss_ce = ce_loss(outputs, label_batch[:].long())
@@ -166,6 +167,7 @@ def trainer_monkaa(args, model, snapshot_path, device):
 
             logging.info('iteration %d : loss : %f L1_loss : %f TV_loss : %f' %
                          (iter_num, loss_batch.item(), l1loss_batch.item(), tv_loss_batch.item()))
+            # print(f"iteration {iter_num}, shuffle: {args.shuffle} indexes : {idxs}")
 
             # if iter_num % 20 == 0:
             #     image = image_batch[1, 0:1, :, :]

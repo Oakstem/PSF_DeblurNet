@@ -2,20 +2,20 @@ import os
 
 from torch.utils.data import DataLoader
 
-from loader.getter import DataLoaderGetter
-from loader.params import DataLoaderParams
-from loader.sub_type import SubType
-from loader.type import Type
+from data.loader.getter import DataLoaderGetter
+from data.loader.params import DataLoaderParams
+from data.loader.sub_type import SubType
+from data.loader.type import Type
 
 
-def load_data(path: str, batch_size: int, train: bool):
+def load_data(path: str, batch_size: int, train: bool, shuffle: bool):
     root_path = path
     type: Type = Type.MONKAA
     sub_type_left: SubType = SubType.FUTURE_LEFT
     sub_type_right: SubType = SubType.FUTURE_RIGHT
     data_loader_params: DataLoaderParams = \
         DataLoaderParams(root_path=root_path, type=type, sub_types = [sub_type_left, sub_type_right],
-                         batch_size=batch_size, shuffle=True)
+                         batch_size=batch_size, shuffle=shuffle)
 
     train_loader: DataLoader = DataLoaderGetter.get_by_params(data_loader_params, train=train)
 

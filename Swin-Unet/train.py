@@ -25,6 +25,7 @@ parser.add_argument('--max_epochs', type=int,
                     default=150, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int,
                     default=10, help='batch_size per gpu')
+parser.add_argument('--shuffle', '-sh', type=bool, default='True', help='shuffle the images in the dataset')
 parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
 parser.add_argument('--deterministic', type=int,  default=1,
                     help='whether use deterministic training')
