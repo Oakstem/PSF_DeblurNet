@@ -36,8 +36,32 @@ class Monkaa(Dataset):
         _, files_blurred = self.run_fast_scandir(self.file_path + slash + self.BLURRED, [".png"])
         _, files_optical = self.run_fast_scandir(self.file_path + slash + self.OPTICAL_FLOW, [".pfm"])
 
+        files_blurred_filtered: []
+        files_optical_filtered: []
+        files_blurred_filtered, files_optical_filtered = \
+            self.filter_files_by_subtypes(files_blurred, files_optical, subtypes)
+
+        files_optical_dict = {}
+        for file_optical in files_optical_filtered:
+            files_optical_dict[file_optical] = file_optical
+
+        files_blurred_dict: {}
+        folders_blurred_dict: {}
+        folders_optical_dict: {}
+        folders_scenes_dict: {}
+        files_blurred_dict, folders_blurred_dict, folders_optical_dict, folders_scenes_dict = \
+            self.create_files_folders_dicts(files_blurred_filtered, files_optical_dict, slash)
+
+        self.filter_files_by_train_test(train, files_blurred_dict, folders_blurred_dict, folders_scenes_dict)
+
+        self.files_blurred: [] = list(files_blurred_dict.keys())
+        self.files_optical: [] = list(files_blurred_dict.values())
+
+    def filter_files_by_subtypes(self, files_blurred, files_optical, subtypes):
+
         files_blurred_filtered: [] = []
         files_optical_filtered: [] = []
+
         if SubType.FUTURE_LEFT in subtypes:
             files_blurred_filtered += [k for k in files_blurred if 'left' in k]
             files_optical_filtered += [k for k in files_optical if 'left' in k and 'into_future' in k]
@@ -51,14 +75,15 @@ class Monkaa(Dataset):
             files_blurred_filtered.append([k for k in files_blurred if 'right' in k])
             files_optical_filtered.append([k for k in files_optical if 'right' in k and 'into_past' in k])
 
-        files_optical_dict = {}
-        for file_optical in files_optical_filtered:
-            files_optical_dict[file_optical] = file_optical
+        return files_blurred_filtered, files_optical_filtered
 
-        files_blurred_dict = {}
-        folders_blurred_dict = {}
-        folders_optical_dict = {}
-        folders_scenes_dict = {}
+    def create_files_folders_dicts(self, files_blurred_filtered, files_optical_dict, slash):
+
+        files_blurred_dict: {} = {}
+        folders_blurred_dict: {} = {}
+        folders_optical_dict: {} = {}
+        folders_scenes_dict: {} = {}
+
         file_blurred: str = ""
         camera_time: str = "into_future"
         for file_blurred in files_blurred_filtered:
@@ -75,7 +100,8 @@ class Monkaa(Dataset):
 
             folders_scenes_dict[scene_blurred_folder].append(file_blurred)
 
-            if file_blurred_path_remainder_list[1] == "into_future" or file_blurred_path_remainder_list[1] == "into_past":
+            if file_blurred_path_remainder_list[1] == "into_future" or file_blurred_path_remainder_list[
+                1] == "into_past":
                 camera_time: str = file_blurred_path_remainder_list[1]
                 camera_side: str = file_blurred_path_remainder_list[2]
                 camera_side_first_letter: str = camera_side[0].upper()
@@ -120,6 +146,9 @@ class Monkaa(Dataset):
 
                 folders_optical_dict[file_optical_folder].append(file_optical_path_to_search)
 
+        return files_blurred_dict, folders_blurred_dict, folders_optical_dict, folders_scenes_dict
+
+    def filter_files_by_train_test(self, train, files_blurred_dict, folders_blurred_dict, folders_scenes_dict):
         if self.TRAIN_TEST_DIVISION == TrainTestDivision.BY_IMAGES:
             for folder_blurred in folders_blurred_dict.keys():
                 folder_blurred_files = folders_blurred_dict[folder_blurred]
@@ -137,7 +166,6 @@ class Monkaa(Dataset):
                 for blurred_file_to_remove in blurred_files_to_remove:
                     del files_blurred_dict[blurred_file_to_remove]
 
-                # print(folder_blurred + ": Train " + str(train_files_num) + ", Test: " + str(test_files_num))
         if self.TRAIN_TEST_DIVISION == TrainTestDivision.BY_SCENES:
             total_num_of_folders = len(folders_scenes_dict)
             test_folders_num = total_num_of_folders * self.TEST_PERCENTAGE // 100
@@ -154,11 +182,6 @@ class Monkaa(Dataset):
             for scene_folder_to_remove in scene_folders_to_remove:
                 for file_to_remove in folders_scenes_dict[scene_folder_to_remove]:
                     del files_blurred_dict[file_to_remove]
-
-        self.files_blurred: [] = list(files_blurred_dict.keys())
-        self.files_optical: [] = list(files_blurred_dict.values())
-
-        print("aa")
 
     def __len__(self):
         return len(self.files_blurred)
