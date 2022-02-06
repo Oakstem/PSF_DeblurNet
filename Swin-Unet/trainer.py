@@ -148,8 +148,9 @@ def trainer_monkaa(args, model, snapshot_path, device):
             image_batch, label_batch = image_batch.to(device), label_batch.to(device)
             outputs = model(image_batch)
             u, v = outputs[:,:num_classes//2,:,:], outputs[:,num_classes//2:,:,:]
-            loss_ce1 = ce_loss(u, label_batch[:,0,:,:].long())
-            loss_ce2 = ce_loss(v, label_batch[:, 1, :, :].long())
+            # Currently clipping all OF values to be 0 to 99
+            loss_ce1 = ce_loss(u, label_batch[:,0,:,:].long().clip(min=0, max=num_classes//2-1))
+            loss_ce2 = ce_loss(v, label_batch[:, 1, :, :].long().clip(min=0, max=num_classes//2-1))
             loss_dice1 = dice_loss(u, label_batch[:,0,:,:], softmax=True)
             loss_dice2 = dice_loss(v, label_batch[:, 1, :, :], softmax=True)
             # loss = 0.4 * loss_ce + 0.6 * loss_dice
