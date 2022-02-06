@@ -130,8 +130,8 @@ def trainer_monkaa(args, model, snapshot_path, device):
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()
-    # ce_loss = CrossEntropyLoss()
-    # dice_loss = DiceLoss(num_classes)
+    ce_loss = CrossEntropyLoss()
+    dice_loss = DiceLoss(num_classes//2)
     l1loss = SmoothL1Loss()
     # optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
@@ -144,15 +144,19 @@ def trainer_monkaa(args, model, snapshot_path, device):
     iterator = tqdm(range(max_epoch), ncols=70)
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
-            image_batch, label_batch, idxs = sampled_batch[0], sampled_batch[1], sampled_batch[2]
+            image_batch, label_batch, idxs = sampled_batch[0], sampled_batch[1]+num_classes//4, sampled_batch[2]
             image_batch, label_batch = image_batch.to(device), label_batch.to(device)
             outputs = model(image_batch)
-            # loss_ce = ce_loss(outputs, label_batch[:].long())
-            # loss_dice = dice_loss(outputs, label_batch, softmax=True)
+            u, v = outputs[:,:num_classes//2,:,:], outputs[:,num_classes//2:,:,:]
+            loss_ce1 = ce_loss(u, label_batch[:,0,:,:].long())
+            loss_ce2 = ce_loss(v, label_batch[:, 1, :, :].long())
+            loss_dice1 = dice_loss(u, label_batch[:,0,:,:], softmax=True)
+            loss_dice2 = dice_loss(v, label_batch[:, 1, :, :], softmax=True)
             # loss = 0.4 * loss_ce + 0.6 * loss_dice
-            tv_loss_batch = tv_loss(outputs)
-            l1loss_batch = l1loss(outputs, label_batch)
-            loss_batch = l1w*l1loss_batch + ltvw*tv_loss_batch
+            # tv_loss_batch = tv_loss(outputs)
+            # l1loss_batch = l1loss(outputs, label_batch)
+            # loss_batch = l1w*l1loss_batch + ltvw*tv_loss_batch
+            loss_batch = 0.4*(loss_ce1 + loss_ce2) + 0.6*(loss_dice1 + loss_dice2)
             optimizer.zero_grad()
             loss_batch.backward()
             optimizer.step()
@@ -163,10 +167,11 @@ def trainer_monkaa(args, model, snapshot_path, device):
             iter_num = iter_num + 1
             writer.add_scalar('info/lr', lr_, iter_num)
             writer.add_scalar('info/total_loss', loss_batch, iter_num)
-            writer.add_scalar('info/loss_tv', tv_loss_batch, iter_num)
+            writer.add_scalar('info/loss_ce', loss_ce1+loss_ce2, iter_num)
 
-            logging.info('iteration %d : loss : %f L1_loss : %f TV_loss : %f' %
-                         (iter_num, loss_batch.item(), l1loss_batch.item(), tv_loss_batch.item()))
+            logging.info('iteration %d : loss : %f ce_loss : %f dice_loss : %f' %
+                         (iter_num, loss_batch.item(), loss_ce1.item()+loss_ce2.item(),
+                          loss_dice1.item() + loss_dice2.item()))
             # print(f"iteration {iter_num}, shuffle: {args.shuffle} indexes : {idxs}")
 
             # if iter_num % 20 == 0:

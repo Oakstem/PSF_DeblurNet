@@ -118,10 +118,10 @@ dmypy.json
 
 backup/
 ABME/
-Swin_Unet/backup
-Swin_Unet/datasets
-Swin_Unet/outputs
-Swin_Unet/lists
+Swin-Unet/backup
+Swin-Unet/datasets
+Swin-Unet/outputs
+Swin-Unet/lists
 *.pth
 *.sh
 *.DESKTOP-BGMRBPK
