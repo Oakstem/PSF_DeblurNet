@@ -2,10 +2,10 @@ import os
 
 from torch.utils.data import DataLoader
 
-from data.loader.getter import DataLoaderGetter
-from data.loader.params import DataLoaderParams
-from data.loader.sub_type import SubType
-from data.loader.type import Type
+from loader.getter import DataLoaderGetter
+from loader.params import DataLoaderParams
+from loader.sub_type import SubType
+from loader.type import Type
 
 
 def load_data(path: str, batch_size: int, train: bool, shuffle: bool):
@@ -32,6 +32,6 @@ if __name__ == "__main__":
     data_dir = os.path.abspath(os.path.join(os.curdir, "data"))
     data_dir = "/home/jupyter"
 
-    load_data(data_dir, batch_size=1, train=True)
-    load_data(data_dir, batch_size=1, train=False)
+    load_data(data_dir, batch_size=1, train=True, shuffle=False)
+    load_data(data_dir, batch_size=1, train=False, shuffle=False)
 
