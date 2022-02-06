@@ -4,15 +4,15 @@ import os.path
 
 import cv2
 import skimage.transform as st
-from PIL import Image
 from numpy import ndarray
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.utils import save_image
+
 
 from ..sub_type import SubType
 from utils import read_pfm
+from .train_test_division import TrainTestDivision
 
 
 class Monkaa(Dataset):
@@ -20,6 +20,7 @@ class Monkaa(Dataset):
     OPTICAL_FLOW = "optical_flow"
 
     TEST_PERCENTAGE = 10
+    TRAIN_TEST_DIVISION = TrainTestDivision.BY_SCENES
 
     def __init__(self, dataset_path: str, subtypes: [SubType], train: bool):
 
@@ -57,12 +58,23 @@ class Monkaa(Dataset):
         files_blurred_dict = {}
         folders_blurred_dict = {}
         folders_optical_dict = {}
+        folders_scenes_dict = {}
         file_blurred: str = ""
         camera_time: str = "into_future"
         for file_blurred in files_blurred_filtered:
             file_blurred_path_remainder: str = file_blurred.replace(self.file_path + slash + self.BLURRED + slash, "")
             file_blurred_path_remainder_list = file_blurred_path_remainder.split(slash)
             scene_name: str = file_blurred_path_remainder_list[0]
+
+            scene_blurred_folder: str = self.file_path + slash + \
+                                        self.BLURRED + slash + \
+                                        scene_name + slash
+
+            if scene_blurred_folder not in folders_scenes_dict:
+                folders_scenes_dict[scene_blurred_folder] = []
+
+            folders_scenes_dict[scene_blurred_folder].append(file_blurred)
+
             if file_blurred_path_remainder_list[1] == "into_future" or file_blurred_path_remainder_list[1] == "into_past":
                 camera_time: str = file_blurred_path_remainder_list[1]
                 camera_side: str = file_blurred_path_remainder_list[2]
@@ -108,24 +120,40 @@ class Monkaa(Dataset):
 
                 folders_optical_dict[file_optical_folder].append(file_optical_path_to_search)
 
-        for folder_blurred in folders_blurred_dict.keys():
-            folder_blurred_files = folders_blurred_dict[folder_blurred]
+        if self.TRAIN_TEST_DIVISION == TrainTestDivision.BY_IMAGES:
+            for folder_blurred in folders_blurred_dict.keys():
+                folder_blurred_files = folders_blurred_dict[folder_blurred]
 
-            total_num_of_files = len(folder_blurred_files)
-            test_files_num = total_num_of_files * self.TEST_PERCENTAGE // 100
-            train_files_num = total_num_of_files - test_files_num
+                total_num_of_files = len(folder_blurred_files)
+                test_files_num = total_num_of_files * self.TEST_PERCENTAGE // 100
+                train_files_num = total_num_of_files - test_files_num
 
-            blurred_files_to_remove: [] = []
-            optical_files_to_remove: [] = []
+                blurred_files_to_remove: [] = []
+                if train:
+                    blurred_files_to_remove = folder_blurred_files[-test_files_num:]
+                else:
+                    blurred_files_to_remove = folder_blurred_files[:train_files_num]
+
+                for blurred_file_to_remove in blurred_files_to_remove:
+                    del files_blurred_dict[blurred_file_to_remove]
+
+                # print(folder_blurred + ": Train " + str(train_files_num) + ", Test: " + str(test_files_num))
+        if self.TRAIN_TEST_DIVISION == TrainTestDivision.BY_SCENES:
+            total_num_of_folders = len(folders_scenes_dict)
+            test_folders_num = total_num_of_folders * self.TEST_PERCENTAGE // 100
+            train_folders_num = total_num_of_folders - test_folders_num
+
+            folders_scenes_list = list(folders_scenes_dict.keys())
+
+            scene_folders_to_remove: [] = []
             if train:
-                blurred_files_to_remove = folder_blurred_files[-test_files_num:]
+                scene_folders_to_remove = folders_scenes_list[-test_folders_num:]
             else:
-                blurred_files_to_remove = folder_blurred_files[:train_files_num]
+                scene_folders_to_remove = folders_scenes_list[:train_folders_num]
 
-            for blurred_file_to_remove in blurred_files_to_remove:
-                del files_blurred_dict[blurred_file_to_remove]
-
-            print(folder_blurred + ": Train " + str(train_files_num) + ", Test: " + str(test_files_num))
+            for scene_folder_to_remove in scene_folders_to_remove:
+                for file_to_remove in folders_scenes_dict[scene_folder_to_remove]:
+                    del files_blurred_dict[file_to_remove]
 
         self.files_blurred: [] = list(files_blurred_dict.keys())
         self.files_optical: [] = list(files_blurred_dict.values())
