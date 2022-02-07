@@ -135,11 +135,11 @@ def train_net(net,
                         experiment.log({
                             'learning rate': optimizer.param_groups[0]['lr'],
                             'validation Dice': val_score,
-                            'images': wandb.Image(images[0].cpu()),
-                            'masks': {
-                                'true': wandb.Image(true_masks[0].float().cpu()),
-                                'pred': wandb.Image(torch.softmax(masks_pred, dim=1).argmax(dim=1)[0].float().cpu()),
-                            },
+                            # 'images': wandb.Image(images[0].cpu()),
+                            # 'masks': {
+                            #     # 'true': wandb.Image(true_masks[0].float().cpu()),
+                            #     # 'pred': wandb.Image(torch.softmax(masks_pred, dim=1).argmax(dim=1)[0].float().cpu()),
+                            # },
                             'step': global_step,
                             'epoch': epoch,
                             **histograms
