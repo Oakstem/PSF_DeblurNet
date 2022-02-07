@@ -11,6 +11,7 @@ def evaluate(net, dataloader, device):
     net.eval()
     num_val_batches = len(dataloader)
     dice_score = 0
+    tot_loss = 0
     ce_loss = CrossEntropyLoss()
     nb_classes = net.n_classes
     dice_loss = DiceLoss(nb_classes // 2)
@@ -39,11 +40,12 @@ def evaluate(net, dataloader, device):
                 # dice_score += multiclass_dice_coeff(mask_pred[:, 1:, ...], mask_true[:, 1:, ...], reduce_batch_first=False)
                 # loss = compute_loss(mask_pred, mask_true, ce_loss, dice_loss, nb_classes)
                 loss, epe = mult_loss(mask_pred, mask_true)
+                tot_loss += loss
            
 
     net.train()
 
     # Fixes a potential division by zero error
     if num_val_batches == 0:
-        return loss
-    return loss / num_val_batches
+        return tot_loss
+    return tot_loss / num_val_batches
