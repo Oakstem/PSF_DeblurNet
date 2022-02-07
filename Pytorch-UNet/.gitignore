@@ -1,5 +1,4 @@
 *.pyc
-data/
 __pycache__/
 checkpoints/
 wandb/
@@ -7,3 +6,4 @@ wandb/
 *.jpg
 venv/
 .idea/
+*.keep
