@@ -22,15 +22,26 @@ class UNet(nn.Module):
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, n_classes)
 
+        # Layers for multi-scale loss compute
+        self.flow1 = predict_flow(1024 // factor)
+        self.flow2 = predict_flow(512 // factor)
+        self.flow3 = predict_flow(256 // factor)
+        self.flow4 = predict_flow(128 // factor)
+
     def forward(self, x):
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
+        flow1 = self.flow1(x5)
         x = self.up1(x5, x4)
+        flow2 = self.flow2(x)
         x = self.up2(x, x3)
+        flow3 = self.flow3(x)
         x = self.up3(x, x2)
+        flow4 = self.flow4(x)
         x = self.up4(x, x1)
         logits = self.outc(x)
-        return logits
+
+        return logits, flow4, flow3, flow2, flow1

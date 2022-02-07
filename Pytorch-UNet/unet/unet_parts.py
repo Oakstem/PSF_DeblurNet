@@ -75,3 +75,7 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+
+
+def predict_flow(in_planes):
+    return nn.Conv2d(in_planes,2,kernel_size=3,stride=1,padding=1,bias=True)

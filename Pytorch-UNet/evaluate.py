@@ -4,6 +4,7 @@ from tqdm import tqdm
 from torch.nn.modules.loss import CrossEntropyLoss
 from utils.dice_score import DiceLoss
 from utils.utils import compute_loss
+from utils.losses import MultiScale
 
 
 def evaluate(net, dataloader, device):
@@ -13,6 +14,7 @@ def evaluate(net, dataloader, device):
     ce_loss = CrossEntropyLoss()
     nb_classes = net.n_classes
     dice_loss = DiceLoss(nb_classes // 2)
+    mult_loss = MultiScale()
 
     # iterate over the validation set
     for batch in tqdm(dataloader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
@@ -35,7 +37,8 @@ def evaluate(net, dataloader, device):
                 # mask_pred = F.one_hot(mask_pred.argmax(dim=1), nb_classes).permute(0, 3, 1, 2).float()
                 # compute the Dice score, ignoring background
                 # dice_score += multiclass_dice_coeff(mask_pred[:, 1:, ...], mask_true[:, 1:, ...], reduce_batch_first=False)
-                loss = compute_loss(mask_pred, mask_true, ce_loss, dice_loss, nb_classes)
+                # loss = compute_loss(mask_pred, mask_true, ce_loss, dice_loss, nb_classes)
+                loss, epe = mult_loss(mask_pred, label_batch)
            
 
     net.train()

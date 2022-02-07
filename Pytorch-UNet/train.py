@@ -18,6 +18,7 @@ from utils.utils import compute_loss
 from evaluate import evaluate
 from unet import UNet
 from data.load_data import load_data
+from utils.losses import MultiScale
 
 dir_data = Path('../..')
 dir_img = Path('./data/imgs/')
@@ -81,6 +82,7 @@ def train_net(net,
     grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
     ce_loss = CrossEntropyLoss()
     dice_loss = DiceLoss(nb_classes//2)
+    mult_loss = MultiScale(args)
     global_step = 0
 
     # 5. Begin training
@@ -89,7 +91,7 @@ def train_net(net,
         epoch_loss = 0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                image_batch, label_batch, idxs = batch[0], batch[1] + nb_classes // 4, batch[2]
+                image_batch, label_batch, idxs = batch[0], batch[1], batch[2]
 
                 assert image_batch.shape[1] == net.n_channels, \
                     f'Network has been defined with {net.n_channels} input channels, ' \
@@ -101,7 +103,8 @@ def train_net(net,
 
                 with torch.cuda.amp.autocast(enabled=amp):
                     outputs = net(image_batch)
-                    loss = compute_loss(outputs, label_batch, ce_loss, dice_loss, nb_classes)
+                    loss, epe = mult_loss(outputs, label_batch)
+                    # loss = compute_loss(outputs, label_batch, ce_loss, dice_loss, nb_classes)
 
                 optimizer.zero_grad(set_to_none=True)
                 grad_scaler.scale(loss).backward()
@@ -176,7 +179,7 @@ if __name__ == '__main__':
     # Change here to adapt to your data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    net = UNet(n_channels=3, n_classes=400, bilinear=True)
+    net = UNet(n_channels=3, n_classes=2, bilinear=True)
 
     logging.info(f'Network:\n'
                  f'\t{net.n_channels} input channels\n'
