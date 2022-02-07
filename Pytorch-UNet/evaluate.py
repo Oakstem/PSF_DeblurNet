@@ -38,7 +38,7 @@ def evaluate(net, dataloader, device):
                 # compute the Dice score, ignoring background
                 # dice_score += multiclass_dice_coeff(mask_pred[:, 1:, ...], mask_true[:, 1:, ...], reduce_batch_first=False)
                 # loss = compute_loss(mask_pred, mask_true, ce_loss, dice_loss, nb_classes)
-                loss, epe = mult_loss(mask_pred, label_batch)
+                loss, epe = mult_loss(mask_pred, mask_true)
            
 
     net.train()
