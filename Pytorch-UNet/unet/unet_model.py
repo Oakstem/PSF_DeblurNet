@@ -45,3 +45,4 @@ class UNet(nn.Module):
         logits = self.outc(x)
 
         return logits, flow4, flow3, flow2, flow1
+

@@ -54,12 +54,12 @@ class L2Loss(nn.Module):
 
 
 class MultiScale(nn.Module):
-    def __init__(self, args=None, startScale = 1, numScales = 5, l_weight= 0.32, norm= 'L2'):
+    def __init__(self, args=None, startScale = 1, numScales = 5, l_weight= 0.64, norm= 'L2'):
         super(MultiScale,self).__init__()
 
         self.startScale = startScale
         self.numScales = numScales
-        self.loss_weights = torch.FloatTensor([(l_weight / 2 ** scale) for scale in range(self.numScales)])
+        self.loss_weights = torch.FloatTensor([(l_weight / 2 ** scale) for scale in range(self.numScales)]).flip(0)
         self.args = args
         self.l_type = norm
         self.div_flow = 0.05
