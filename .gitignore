@@ -130,3 +130,9 @@ Swin-Unet/lists/lists_Synapse/test_vol.txt
 Swin-Unet/lists/lists_Synapse/train.txt
 Swin-Unet/outputs/log.txt
 *.txt
+FlowNetPytorch/flying_chairs
+FlowNetPytorch/wandb
+Pytorch-UNet/
+*.pfm
+FlowNetPytorch/LICENSE
+*.gif
