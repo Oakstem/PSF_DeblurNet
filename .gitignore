@@ -137,3 +137,8 @@ Pytorch-UNet/
 FlowNetPytorch/LICENSE
 *.gif
 flownet2-pytorch/Dockerfile
+flownet2-pytorch/work
+flownet2-pytorch/
+RAFT/
+*.tar
+

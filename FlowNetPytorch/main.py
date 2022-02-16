@@ -87,7 +87,7 @@ parser.add_argument('--print_freq', '-p', default=5, type=int,
                     metavar='N', help='print frequency')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--pretrained', dest='pretrained', default="",
+parser.add_argument('--pretrained', dest='pretrained', default="checkpoint.pth.tar",
                     help='path to pre-trained model')
 parser.add_argument('--no-date', action='store_false',
                     help='don\'t append date timestamp to folder' )
@@ -137,59 +137,11 @@ def main():
                                   amp=False))
     train_writer = []
     test_writer = []
-    # train_writer = SummaryWriter(os.path.join(save_path,'train'))
-    # test_writer = SummaryWriter(os.path.join(save_path,'test'))
-    output_writers = []
-    # for i in range(3):
-    #     output_writers.append(SummaryWriter(os.path.join(save_path,'test',str(i))))
 
-    # Data loading code
-    # input_transform = transforms.Compose([
-    #     flow_transforms.ArrayToTensor(),
-    #     transforms.Normalize(mean=[0,0,0], std=[255,255,255]),
-    #     transforms.Normalize(mean=[0.45,0.432,0.411], std=[1,1,1])
-    # ])
-    # target_transform = transforms.Compose([
-    #     flow_transforms.ArrayToTensor(),
-    #     transforms.Normalize(mean=[0,0],std=[args.div_flow,args.div_flow])
-    # ])
-    #
-    # if 'KITTI' in args.dataset:
-    #     args.sparse = True
-    # if args.sparse:
-    #     co_transform = flow_transforms.Compose([
-    #         flow_transforms.RandomCrop((320,448)),
-    #         flow_transforms.RandomVerticalFlip(),
-    #         flow_transforms.RandomHorizontalFlip()
-    #     ])
-    # else:
-    #     co_transform = flow_transforms.Compose([
-    #         flow_transforms.RandomTranslate(10),
-    #         flow_transforms.RandomRotate(10,5),
-    #         flow_transforms.RandomCrop((320,448)),
-    #         flow_transforms.RandomVerticalFlip(),
-    #         flow_transforms.RandomHorizontalFlip()
-    #     ])
+    output_writers = []
+
 
     print("=> fetching img pairs in '{}'".format(data_path))
-    # train_set, test_set = datasets.__dict__[args.dataset](
-    #     args.data,
-    #     transform=input_transform,
-    #     target_transform=target_transform,
-    #     co_transform=co_transform,
-    #     split=args.split_file if args.split_file else args.split_value
-    # )
-    # print('{} samples found, {} train samples and {} test samples '.format(len(test_set)+len(train_set),
-    #                                                                        len(train_set),
-    #                                                                        len(test_set)))
-    # train_loader = torch.utils.data.DataLoader(
-    #     train_set, batch_size=args.batch_size,
-    #     num_workers=args.workers, pin_memory=True, shuffle=True)
-    # val_loader = torch.utils.data.DataLoader(
-    #     test_set, batch_size=args.batch_size,
-    #     num_workers=args.workers, pin_memory=True, shuffle=False)
-    # data_path = "G:/My Drive/Colab Notebooks/test_chairs/"
-    # data_path = os.path.abspath(data_path)
 
     train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit)
     val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit)
@@ -200,6 +152,7 @@ def main():
     if args.pretrained:
         network_data = torch.load(os.path.join("checkpoints", args.pretrained), map_location=device)
         args.arch = network_data['arch']
+        model.load_state_dict(network_data['state_dict'])
         print("=> using pre-trained model '{}'".format(args.arch))
     else:
         network_data = None
@@ -233,9 +186,9 @@ def main():
         optimizer = torch.optim.SGD(param_groups, args.lr,
                                     momentum=args.momentum)
 
-    if args.evaluate:
-        best_EPE = validate(val_loader, model, raft_model, 0, output_writers, experiment)
-        return
+    # if args.evaluate:
+    #     best_EPE = validate(val_loader, model, raft_model, 0, output_writers, experiment)
+    #     return
 
 
 
@@ -258,16 +211,14 @@ def main():
         # train for one epoch
 
             # train_loss, train_EPE, experiment = train(train_loader, model, optimizer, epoch, train_writer, experiment)
-        experiment = train(train_loader, model, raft_model, optimizer, epoch, train_writer, experiment)
+        if not args.evaluate:
+            experiment = train(train_loader, model, raft_model, optimizer, epoch, train_writer, experiment)
         # train_writer.add_scalar('mean EPE', train_EPE, epoch)
 
-        scheduler.step()
+            scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(val_loader, model, raft_model, epoch, output_writers, experiment)
-
-
-        # test_writer.add_scalar('mean EPE', EPE, epoch)
+            experiment, EPE = validate(train_loader, model, raft_model, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -380,7 +331,7 @@ def validate(val_loader, model, flow_model, epoch, output_writers, experiment):
         # output = model(input)
         frame1, frame2 = model(input)
         flow = flow_model(frame1, frame2, iters=20, test_mode=True)
-
+        # print(f"flow[1] shape:{flow[1].shape}")
         # flow2_EPE += args.div_flow*realEPE(output, target, sparse=args.sparse)
         flow2_EPE += args.div_flow*criterion(flow[1], target)
         # record EPE
@@ -401,10 +352,10 @@ def validate(val_loader, model, flow_model, epoch, output_writers, experiment):
         'learning rate': args.lr,
         'validation loss': avg_epe,
         'images': wandb.Image(input[0].cpu()),
-        # 'flows': {
-        #     'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
-        #     'pred': wandb.Image(flow2rgb(args.div_flow * output[0], max_value=max_val).transpose((1,2,0))),
-        # },
+        'flows': {
+            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val/2).transpose((1,2,0))),
+            'pred': wandb.Image(flow2rgb(args.div_flow * flow[1][0], max_value=max_val).transpose((1,2,0))),
+        },
         'step': n_iter,
         'epoch': epoch,
     })
