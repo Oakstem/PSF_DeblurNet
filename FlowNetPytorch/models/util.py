@@ -25,6 +25,26 @@ def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1):
         )
 
 
+def conv_block(batchNorm, in_planes, out_planes):
+    mid_planes = (in_planes+out_planes) // 2
+    if batchNorm:
+        return nn.Sequential(
+            nn.Conv2d(in_planes, mid_planes, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(mid_planes),
+            nn.LeakyReLU(0.1,inplace=True),
+            nn.Conv2d(mid_planes, out_planes, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_planes),
+            nn.LeakyReLU(0.1, inplace=True)
+        )
+    else:
+        return nn.Sequential(
+            nn.Conv2d(in_planes, mid_planes, kernel_size=3, stride=2, padding=1, bias=True),
+            nn.LeakyReLU(0.1,inplace=True),
+            nn.Conv2d(mid_planes, out_planes, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.LeakyReLU(0.1, inplace=True)
+        )
+
+
 def predict_flow(in_planes):
     return nn.Conv2d(in_planes,2,kernel_size=3,stride=1,padding=1,bias=False)
 
@@ -56,3 +76,7 @@ def crop_like(input, target):
         return input
     else:
         return input[:, :, :target.size(2), :target.size(3)]
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

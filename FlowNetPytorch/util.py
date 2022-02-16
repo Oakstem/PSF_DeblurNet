@@ -53,9 +53,11 @@ def flow2rgb(flow_map, max_value):
 def generate_img(flow1, flow2, max_val, div_flow):
     # pred_flow_img = flow2color(flow1.squeeze().permute((1, 2, 0)))
     # gt_flow_img = flow2color(flow2.squeeze().permute((1, 2, 0)))
-    fig, axs = plt.subplots(len(flow1), 2)
+    fig, axs = plt.subplots(1, 2)
     for idx in range(len(flow1)):
         pred_flow_img = flow2rgb(div_flow * flow2[idx], max_val).transpose((1, 2, 0))
         gt_flow_img = flow2rgb(div_flow * flow1[idx], max_val).transpose((1, 2, 0))
-        axs[idx, 0].imshow(gt_flow_img)
-        axs[idx, 1].imshow(pred_flow_img)
+        axs[0].imshow(gt_flow_img)
+        axs[1].imshow(pred_flow_img)
+        axs[0].set_title("Ground Truth")
+        axs[1].set_title("Predicted")
