@@ -6,6 +6,7 @@ import logging
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+import torchvision.transforms.functional as tr_f
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
@@ -21,6 +22,7 @@ from multiscaleloss import multiscaleEPE, realEPE
 import datetime
 from torch.utils.tensorboard import SummaryWriter
 from util import flow2rgb, AverageMeter, save_checkpoint, generate_img
+from models.util import conv, conv_block, predict_flow, deconv, crop_like, correlate
 from torch.nn import SmoothL1Loss
 
 model_names = sorted(name for name in models.__dict__
@@ -93,7 +95,7 @@ parser.add_argument('--no-date', action='store_false',
                     help='don\'t append date timestamp to folder' )
 parser.add_argument('--div_flow', default=20, type=float,
                     help='value by which flow will be divided. Original value is 20 but 1 with batchNorm gives good results')
-parser.add_argument('--milestones', default=[100,150,200], metavar='N', nargs='*', help='epochs at which learning rate is divided by 2')
+parser.add_argument('--milestones', default=[30,60,80], metavar='N', nargs='*', help='epochs at which learning rate is divided by 2')
 
 
 
@@ -207,6 +209,8 @@ def main():
                 Images scaling:  {1}
                 Mixed Precision: {False}
             ''')
+    args.div_flow = 20
+    args.nb_raft_iter = 8
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
 
@@ -218,7 +222,7 @@ def main():
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(train_loader, model, raft_model, epoch, output_writers, experiment)
+            experiment, EPE = validate(val_loader, model, raft_model, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -255,7 +259,10 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
 
     criterion = SmoothL1Loss()
     end = time.time()
+    loss_weights = [0.20, 0.35, 0.45]
     with tqdm(total=len(train_loader)*args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
+
+        tot_loss = 0
         for i, (input, target, idx) in enumerate(train_loader):
             # measure data loading time
             # data_time.update(time.time() - end)
@@ -265,15 +272,31 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
 
             # compute output
             frame1, frame2 = model(input)
-            flow = flow_model(frame1, frame2, iters=20, test_mode=True)
-            if args.sparse:
-                # Since Target pooling is not very precise when sparse,
-                # take the highest resolution prediction and upsample it instead of downsampling target
-                h, w = target.size()[-2:]
-                output = [F.interpolate(output[0], (h,w)), *output[1:]]
+            flow = flow_model(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+            sm_tgt = tr_f.resize(target, flow[0].shape[-1])
+            loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
+            loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
+            loss = loss1 + loss2
+            tot_loss += loss.item()
+            # print(f"Actual Loss:{loss}")
+            # for ind in range(len(frame1)):
+            #     sz = frame1[ind].shape[-1]//8
+            #     if sz > 4:
+            #         print(f"index:{ind}")
+            #         tgt = tr_f.center_crop(target, sz * 8)
+            #         flow = flow_model(frame1[ind], frame2[ind], iters=8, test_mode=True)
+            #
+            #         loss = loss_weights[ind]*args.div_flow*criterion(flow[1], tgt)
+            #
+            #         loss.backward(retain_graph=True)
+            #
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
             # loss = multiscaleEPE(output, target, weights=args.multiscale_weights, sparse=args.sparse)
-            loss = criterion(flow[1], target)
+
             # flow2_EPE = args.div_flow * realEPE(output[0], target, sparse=args.sparse)
             # record loss and EPE
             # losses.update(loss.item(), target.size(0))
@@ -281,9 +304,6 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
             # flow2_EPEs.update(flow2_EPE.item(), target.size(0))
 
             # compute gradient and do optimization step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
 
             # measure elapsed time
             # batch_time.update(time.time() - end)
@@ -292,11 +312,11 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
 
             pbar.update(input.shape[0])
             experiment.log({
-                'train loss': loss.item(),
+                'train loss': tot_loss/(i+1),
                 'step': n_iter,
                 'epoch': epoch
             })
-            pbar.set_postfix(**{'loss (batch)': loss.item()})
+            pbar.set_postfix(**{'loss (batch)': tot_loss/(i+1)})
             # if i % args.print_freq == 0:
             #     print('Epoch: [{0}][{1}/{2}]\t Time {3}\t Data {4}\t Loss {5}\t EPE {6}'
             #           .format(epoch, i, epoch_size, batch_time,
@@ -319,41 +339,46 @@ def validate(val_loader, model, flow_model, epoch, output_writers, experiment):
     flow_model.eval()
     model.to(device)
     flow_model.to(device)
-    flow2_EPE = 0
     criterion = SmoothL1Loss()
-    # end = time.time()
+    loss_weights = [0.20, 0.35, 0.45]
+    tot_loss = 0
     for i, (input, target, idx) in enumerate(val_loader):
         target = target.to(device)
         # input = torch.cat(input,1).to(device)
         input = input.to(device)
 
         # compute output
-        # output = model(input)
         frame1, frame2 = model(input)
-        flow = flow_model(frame1, frame2, iters=20, test_mode=True)
+        flow = flow_model(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+        sm_tgt = tr_f.resize(target, flow[0].shape[-1])
+        loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
+        loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
+        loss = loss1 + loss2
+        tot_loss += loss.item()
         # print(f"flow[1] shape:{flow[1].shape}")
         # flow2_EPE += args.div_flow*realEPE(output, target, sparse=args.sparse)
-        flow2_EPE += args.div_flow*criterion(flow[1], target)
+        # flow2_EPE += args.div_flow*criterion(flow[1], target)
         # record EPE
         # flow2_EPEs.update(flow2_EPE.item(), target.size(0))
 
         # measure elapsed time
         # batch_time.update(time.time() - end)
         # end = time.time()
-        max_val = 20
+
         # if i < len(output_writers):  # log first output of first batches
         # if args.evaluate:
         #     generate_img(target, flow, max_val, args.div_flow)
 
         # if i < 1:
-    avg_epe = (flow2_EPE/len(val_loader)).item()
+    max_val = 10
+    avg_epe = (tot_loss/len(val_loader))
     logging.info('Validation epe score: {}'.format(avg_epe))
     experiment.log({
         'learning rate': args.lr,
         'validation loss': avg_epe,
         'images': wandb.Image(input[0].cpu()),
         'flows': {
-            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val/2).transpose((1,2,0))),
+            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
             'pred': wandb.Image(flow2rgb(args.div_flow * flow[1][0], max_value=max_val).transpose((1,2,0))),
         },
         'step': n_iter,

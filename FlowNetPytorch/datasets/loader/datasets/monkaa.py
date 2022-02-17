@@ -26,7 +26,7 @@ class Monkaa(Dataset):
 
         self.subtype: SubType = subtypes
         self.img_size = 264
-        self.opt_offset = 15.5
+        self.div_flow = 20
         # In case you want to limit training to a smaller dataset
         self.limit_percent = limit_percent
         self.test_percent = test_percent
@@ -152,7 +152,8 @@ class Monkaa(Dataset):
         transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Resize((image_blurred_height, image_blurred_width)),
-             transforms.CenterCrop(self.img_size)])
+             transforms.CenterCrop(self.img_size),
+             transforms.Normalize(mean=[0,0],std=[self.div_flow, self.div_flow])])
              # transforms.CenterCrop(image_blurred_height), transforms.Normalize((0, 0), (5, 5))])
 
         image_optical_path = self.files_optical[index]

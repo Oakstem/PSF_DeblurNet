@@ -87,31 +87,49 @@ class Decoder(nn.Module):
         dec6 = self.decoders[5](torch.cat((encs[5], trs[5]), dim=1))
         dec_up6 = crop_like(self.dec6_up(dec6), encs[4])
         dec_rgb6 = self.dec6_torgb(dec_up6)
+        if dec_rgb6.shape[-1]/8 != dec_rgb6.shape[-1]//8:
+            sz = 8*(dec_rgb6.shape[-1]//8)
+            dec_rgb6 = dec_rgb6[:,:,:sz,:sz]
 
         dec5 = self.decoders[4](torch.cat((encs[4], trs[4], dec_up6), dim=1))
         dec_up5 = crop_like(self.dec5_up(dec5), encs[3])
         dec_rgb5 = self.dec5_torgb(dec_up5)
+        if dec_rgb5.shape[-1]/8 != dec_rgb5.shape[-1]//8:
+            sz = 8*(dec_rgb5.shape[-1]//8)
+            dec_rgb5 = dec_rgb5[:,:,:sz,:sz]
 
         dec4 = self.decoders[3](torch.cat((encs[3], trs[3], dec_up5), dim=1))
         dec_up4 = crop_like(self.dec4_up(dec4), encs[2])
         dec_rgb4 = self.dec4_torgb(dec_up4)
+        if dec_rgb4.shape[-1]/8 != dec_rgb4.shape[-1]//8:
+            sz = 8*(dec_rgb4.shape[-1]//8)
+            dec_rgb4 = dec_rgb4[:,:,:sz,:sz]
 
         dec3 = self.decoders[2](torch.cat((encs[2], trs[2], dec_up4), dim=1))
         dec_up3 = crop_like(self.dec3_up(dec3), encs[1])
         dec_rgb3 = self.dec3_torgb(dec_up3)
+        if dec_rgb3.shape[-1]/8 != dec_rgb3.shape[-1]//8:
+            sz = 8*(dec_rgb3.shape[-1]//8)
+            dec_rgb3 = dec_rgb3[:,:,:sz,:sz]
 
         dec2 = self.decoders[1](torch.cat((encs[1], trs[1], dec_up3), dim=1))
         dec_up2 = crop_like(self.dec2_up(dec2), encs[0])
         dec_rgb2 = self.dec2_torgb(dec_up2)
+        if dec_rgb2.shape[-1]/8 != dec_rgb2.shape[-1]//8:
+            sz = 8*(dec_rgb2.shape[-1]//8)
+            dec_rgb2 = dec_rgb2[:,:,:sz,:sz]
 
         dec1 = self.decoders[0](torch.cat((encs[0], trs[0], dec_up2), dim=1))
         dec_up1 = self.dec1_up(dec1)
+        if dec_up1.shape[-1]/8 != dec_up1.shape[-1]//8:
+            sz = 8*(dec_up1.shape[-1]//8)
+            dec_up1 = dec_up1[:,:,:sz,:sz]
 
         # dec5 = self.decoders[5](torch.cat((encs[4], trs[4], dec_up1), dim=1))
         # dec_up5 = self.dec6_up(dec5)
 
         # return dec1, dec2, dec3, dec4, dec5, dec6
-        return dec_up1     #, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6
+        return dec_up1, dec_rgb2, dec_rgb3  #, dec_rgb4, dec_rgb5, dec_rgb6 #, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6
 
 class STN(nn.Module):
     def __init__(self):
