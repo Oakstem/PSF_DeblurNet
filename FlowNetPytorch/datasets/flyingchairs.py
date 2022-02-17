@@ -20,8 +20,7 @@ def make_dataset(dir, split=None):
     return split2list(images, split, default_split=0.97)
 
 
-def flying_chairs(root, transform=None, target_transform=None,
-                  co_transform=None, split=None):
+def flying_chairs(root, transform=None, target_transform=None, co_transform=None, split=None):
     train_list, test_list = make_dataset(root,split)
     train_dataset = ListDataset(root, train_list, transform, target_transform, co_transform)
     test_dataset = ListDataset(root, test_list, transform, target_transform)

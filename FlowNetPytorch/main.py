@@ -1,6 +1,8 @@
 import argparse
 import os
 import time
+
+import numpy as np
 import wandb
 import logging
 from tqdm import tqdm
@@ -111,6 +113,8 @@ def main():
         data_path = "/content/drive/MyDrive/test_chairs"
     except:
         data_path = "G:/My Drive/Colab Notebooks/test_chairs"
+        data_path = "/home/jupyter/FlyingChairs2"
+
 
     args = parser.parse_args()
     save_path = '{},{},{}epochs{},b{},lr{}'.format(
