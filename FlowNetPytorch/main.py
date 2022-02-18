@@ -113,7 +113,7 @@ def main():
         data_path = "/content/drive/MyDrive/test_chairs"
     except:
         data_path = "G:/My Drive/Colab Notebooks/test_chairs"
-        data_path = "/home/jupyter/FlyingChairs2"
+        data_path = "/home/jupyter/"
 
 
     args = parser.parse_args()
