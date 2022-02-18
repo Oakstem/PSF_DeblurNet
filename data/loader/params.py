@@ -1,4 +1,4 @@
-from .type import Type
+from data.type import Type
 from .sub_type import SubType
 
 

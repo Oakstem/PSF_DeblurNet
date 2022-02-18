@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from .loader.getter import DataLoaderGetter
 from .loader.params import DataLoaderParams
 from .loader.sub_type import SubType
-from .loader.type import Type
+from data.type import Type
 
 
 def load_data(path: str, batch_size: int, train: bool, shuffle: bool, limit: float):

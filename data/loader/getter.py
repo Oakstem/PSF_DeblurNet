@@ -6,7 +6,7 @@ from .datasets.flying_chairs2 import FlyingChairs2
 from .datasets.test import Test
 from .datasets.monkaa import Monkaa
 from .params import DataLoaderParams
-from .type import Type
+from data.type import Type
 
 
 class DataLoaderGetter:

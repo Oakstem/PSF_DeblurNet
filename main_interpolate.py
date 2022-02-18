@@ -4,6 +4,7 @@ import argparse
 
 from data.load_data import load_data
 from data.preprocess.preprocess import apply_blur
+from data.type import Type
 
 
 def main():
@@ -23,11 +24,11 @@ def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
     abs_path = "/home/jupyter/"
-    data_path = os.path.join(abs_path, "Monkaa")
+    type: Type = Type.MONKAA
     #train_dataloader = load_data(abs_path, batch_size=5, train=True, shuffle=False, limit=0.9)
     #test_dataloader = load_data(abs_path, batch_size=5, train=False, shuffle=False, limit=0.9)
 
-    apply_blur(abs_path, start_scene_index=args.start_indx, target_size=args.sz, do_apply_gamma=args.gamm)
+    apply_blur(type, abs_path, start_scene_index=args.start_indx, target_size=args.sz, do_apply_gamma=args.gamm)
 
 
 if __name__ == "__main__":

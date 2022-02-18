@@ -1,23 +1,28 @@
 import os
 from pathlib import Path
 
+from data.type import Type
 
-def get_dataset_path(data_type: str, root: str):
-    if "monkaa" in data_type.lower():
-        target_root = os.path.join(root, 'Monkaa/blurred_test')
-        flow_root = os.path.join(root, 'Monkaa/optical_flow')
-        rgb_root = os.path.join(root, 'Monkaa/frames_cleanpass')
-        Path(target_root).mkdir(parents=True, exist_ok=True)
-    elif "flying_chairs2" in data_type.lower():
-        target_root = os.path.join(root, 'FlyingChairs2/train')
-        flow_root = os.path.join(root, 'FlyingChairs2/train')
-        rgb_root = os.path.join(root, 'FlyingChairs2/train')
-        Path(target_root).mkdir(parents=True, exist_ok=True)
+
+def get_dataset_path(type: Type, data_path: str):
+    if type == Type.MONKAA:
+        data_path = os.path.join(data_path, "Monkaa")
+        target_root = os.path.join(data_path, 'blurred_test')
+        flow_root = os.path.join(data_path, 'optical_flow')
+        rgb_root = os.path.join(data_path, 'frames_cleanpass')
+    elif type == Type.FLYING_CHAIRS2:
+        data_path = os.path.join(data_path, "FlyingChairs2")
+        target_root = os.path.join(data_path, 'train')
+        flow_root = os.path.join(data_path, 'train')
+        rgb_root = os.path.join(data_path, 'train')
     else:
         target_root = ""
         flow_root = ""
         rgb_root = ""
         print("Error! Unknown dataset type")
+
+    if target_root != "" and not os.path.exists(target_root):
+        Path(target_root).mkdir(parents=True, exist_ok=True)
 
     return target_root, flow_root, rgb_root
 

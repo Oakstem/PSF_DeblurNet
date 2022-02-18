@@ -12,24 +12,36 @@ from data.preprocess.debug import debug_interp_frames
 from data.preprocess.gamma import apply_gamma
 from data.preprocess.interpolations.interpolations import get_interpolations
 from data.preprocess.path import get_dataset_path, get_blurred_image_path, create_scene_dir
+from data.type import Type
+
+NUM_GT_IN_BATCH = 2
 
 
-def apply_blur(root: str, start_scene_index: int = 0, target_size: list = [270, 480], do_apply_gamma: bool = True,
-               side: str = "right"):
-    num_gt_in_batch = 2
+def apply_blur(type: Type, data_path: str, start_scene_index: int = 0, target_size: list = [270, 480],
+               do_apply_gamma: bool = True, side: str = "right"):
+    target_root, flow_root, rgb_root = get_dataset_path(type, data_path)
+    print(f"Target_root:{target_root}")
+    if target_root is None:
+        return
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     cams, psfs = load_cam_models(device)
 
     resize = Resize(target_size)
 
-    target_root, flow_root, rgb_root = get_dataset_path("monkaa", root)
-    print(f"Target_root:{target_root}")
-    if target_root is None:
-        return
+    if type == Type.MONKAA:
+        images_list: [] = []
+        total_images_num: int = 0
+        images_list, total_images_num = get_filenames_from_subfolders(rgb_root, side)
+        _apply_blur(target_root, flow_root, images_list, total_images_num, start_scene_index, resize, do_apply_gamma, side,
+                    device, cams, psfs)
+    if type == Type.FLYING_CHAIRS2:
+        files_left = get_filenames_by_extention(rgb_root, "-img_0.png")
+        files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
 
-    images_list, total_images_num = get_filenames(rgb_root, side)
 
+def _apply_blur(target_root: str, flow_root: str, images_list, total_images_num, start_scene_index: int, resize: Resize,
+                do_apply_gamma: bool, side: str, device, cams, psfs):
     processed_count = 0
     cnt_prev = 0
     t = time.time()
@@ -37,8 +49,8 @@ def apply_blur(root: str, start_scene_index: int = 0, target_size: list = [270, 
         scene_name = create_scene_dir(target_root, images_list[idx][0], idx)
 
         # Loop through all images in the scene
-        for idy, img in enumerate(images_list[idx][:-num_gt_in_batch + 1]):
-            img_pair = images_list[idx][idy:idy + num_gt_in_batch]
+        for idy, img in enumerate(images_list[idx][:-NUM_GT_IN_BATCH + 1]):
+            img_pair = images_list[idx][idy:idy + NUM_GT_IN_BATCH]
 
             # Get blurred img path
             blur_path, image_name = get_blurred_image_path(target_root, scene_name, img, side)
@@ -117,7 +129,7 @@ def apply_psf(cam: list, psfs: list, batch: torch.Tensor, nb_imgs: int, do_apply
     return blurred_image
 
 
-def get_filenames(root: str, side: str):
+def get_filenames_from_subfolders(root: str, side: str):
     images_list = []
     total_images_num = 0
 
@@ -140,3 +152,13 @@ def get_filenames(root: str, side: str):
 
     print(f"Total number of images to process:{total_images_num}")
     return images_list, total_images_num
+
+
+def get_filenames_by_extention(dir, files_extention: str):
+        files = []
+        for f in os.scandir(dir):
+            if f.is_file():
+                if files_extention in f.name:
+                    files.append(f.path)
+
+        return files
