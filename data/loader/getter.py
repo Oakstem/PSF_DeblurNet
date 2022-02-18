@@ -2,6 +2,7 @@ import os
 
 from torch.utils.data import DataLoader, Dataset
 
+from .datasets.flying_chairs2 import FlyingChairs2
 from .datasets.test import Test
 from .datasets.monkaa import Monkaa
 from .params import DataLoaderParams
@@ -20,6 +21,8 @@ class DataLoaderGetter:
             dataset: Test = Test(dataset_path, train)
         if data_loader_params.type == Type.MONKAA:
             dataset: Monkaa = Monkaa(dataset_path, data_loader_params.sub_types, train, limit_percent=limit)
+        if data_loader_params.type == Type.FLYING_CHAIRS2:
+            dataset: FlyingChairs2 = FlyingChairs2(dataset_path, data_loader_params.sub_types, train)
 
         data_loader: DataLoader = None
         if dataset is not None:
