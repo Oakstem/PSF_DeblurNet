@@ -68,7 +68,7 @@ def _apply_blur_monkaa(target_root: str, flow_root: str, images_list: [], total_
             blur_path, image_name = get_blurred_image_path(target_root, scene_name, img, side)
 
             # Get the OF
-            num_images, _ = get_interpolations_num(flow_root, scene_name, image_name, side)
+            num_images, _ = get_interpolations_num_monkaa(flow_root, scene_name, image_name, side)
 
             if num_images is not None and len(img_pair) == 2:
                 if device == torch.device("cuda"):
@@ -90,9 +90,45 @@ def _apply_blur_monkaa(target_root: str, flow_root: str, images_list: [], total_
                     prev_processed_count = processed_count
                     t = time.time()
 
+def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left: [], images_list_right: [],
+                              total_images_num: int, start_scene_index: int, resize: Resize, do_apply_gamma: bool,
+                              side: str, device: int or str, cams: [camera_model], psfs: [Tensor]):
+    processed_count = 0
+    prev_processed_count = 0
+    t = time.time()
+    for idx in range(start_scene_index, len(images_list_left)):
+        image_left = images_list_left[idx]
+        image_right = images_list_right[idx]
 
-def get_interpolations_num(flow_root: str, scene_name: str, img_name: str, side: str, min_nb: int = 5,
-                           max_pxl_step: int = 170, scale_reduct: int = 2):
+        # Get blurred img path
+        blur_path, image_name = get_blurred_image_path(target_root, scene_name, img, side)
+
+        # Get the OF
+        num_images, _ = get_interpolations_num_monkaa(flow_root, scene_name, image_name, side)
+
+        if num_images is not None:
+            if device == torch.device("cuda"):
+                batch = get_interpolations(image_left, image_right, num_images, resize, apply_gamma=True)
+            else:
+                # only for debugging, not a real interpolation
+                batch = debug_interp_frames(image_left, image_right, num_images + 2)
+
+            # Apply the suitable PSF conv
+            blurred_image = apply_psf(cams, psfs, batch, num_images, do_apply_gamma)
+            # Save results to /blurred  directory
+            blurred_image.save(blur_path)
+
+            processed_count += 1
+            if processed_count % 10 == 0:
+                elapsed = time.time() - t
+                print(f"Number of processed images: {processed_count}/{total_images_num}, scene index:{idx}, "
+                        f"time per image:{(elapsed / (processed_count - prev_processed_count)):0.1f} sec")
+                prev_processed_count = processed_count
+                t = time.time()
+
+
+def get_interpolations_num_monkaa(flow_root: str, scene_name: str, img_name: str, side: str, min_nb: int = 5,
+                                  max_pxl_step: int = 170, scale_reduct: int = 2):
     if side == "left":
         letter = "L"
     else:
@@ -101,6 +137,12 @@ def get_interpolations_num(flow_root: str, scene_name: str, img_name: str, side:
     # Find L2 distance of flow movement, if within threshold, return number of frame interpolation
     pfm_file_name = f"into_future/{side}/OpticalFlowIntoFuture_{img_name[:-4]}_{letter}.pfm"
     optical_flow_file_path = os.path.join(flow_root, scene_name, pfm_file_name)
+
+    return _get_interpolations_num(optical_flow_file_path, min_nb, max_pxl_step, scale_reduct)
+
+
+def _get_interpolations_num(optical_flow_file_path: str, min_nb: int = 5, max_pxl_step: int = 170,
+                            scale_reduct: int = 2):
     optical_flow = read_pfm(optical_flow_file_path)[0]
 
     distance = np.sqrt(optical_flow[..., 0]**2+optical_flow[..., 1]**2)
