@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 from .loader.getter import DataLoaderGetter
 from .loader.params import DataLoaderParams
-from .loader.sub_type import SubType
+from data.sub_type import SubType
 from data.type import Type
 
 

@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import os
 
+from torch import Tensor
+
 from data.IMPROVE_camera_model import camera_model
 from torchvision.transforms import Resize
 from torchvision import transforms
@@ -11,20 +13,24 @@ from data.files_reader.pfm import read_pfm
 from data.preprocess.debug import debug_interp_frames
 from data.preprocess.gamma import apply_gamma
 from data.preprocess.interpolations.interpolations import get_interpolations
-from data.preprocess.path import get_dataset_path, get_blurred_image_path, create_scene_dir
+from data.preprocess.files_folders import get_dataset_path, get_blurred_image_path, create_scene_dir, \
+    get_filenames_from_subfolders, get_filenames_by_extention
+from data.sub_type import SubType
 from data.type import Type
 
 NUM_GT_IN_BATCH = 2
 
 
-def apply_blur(type: Type, data_path: str, start_scene_index: int = 0, target_size: list = [270, 480],
-               do_apply_gamma: bool = True, side: str = "right"):
+def apply_blur(type: Type, sub_type: SubType, data_path: str, start_scene_index: int = 0,
+               target_size: list = [270, 480], do_apply_gamma: bool = True):
     target_root, flow_root, rgb_root = get_dataset_path(type, data_path)
     print(f"Target_root:{target_root}")
     if target_root is None:
         return
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    cams: [camera_model] = None
+    psfs: [Tensor] = None
     cams, psfs = load_cam_models(device)
 
     resize = Resize(target_size)
@@ -32,16 +38,22 @@ def apply_blur(type: Type, data_path: str, start_scene_index: int = 0, target_si
     if type == Type.MONKAA:
         images_list: [] = []
         total_images_num: int = 0
+        side: str == ""
+        if sub_type == SubType.PAST_LEFT or sub_type == SubType.FUTURE_LEFT:
+            side = "left"
+        else:
+            side = 'right'
         images_list, total_images_num = get_filenames_from_subfolders(rgb_root, side)
-        _apply_blur(target_root, flow_root, images_list, total_images_num, start_scene_index, resize, do_apply_gamma, side,
-                    device, cams, psfs)
+        _apply_blur(target_root, flow_root, images_list, total_images_num, start_scene_index, resize, do_apply_gamma,
+                    side, device, cams, psfs)
     if type == Type.FLYING_CHAIRS2:
         files_left = get_filenames_by_extention(rgb_root, "-img_0.png")
         files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
 
 
-def _apply_blur(target_root: str, flow_root: str, images_list, total_images_num, start_scene_index: int, resize: Resize,
-                do_apply_gamma: bool, side: str, device, cams, psfs):
+def _apply_blur(target_root: str, flow_root: str, images_list: [], total_images_num: int, start_scene_index: int,
+                resize: Resize, do_apply_gamma: bool, side: str, device: int or str, cams: [camera_model],
+                psfs: [Tensor]):
     processed_count = 0
     cnt_prev = 0
     t = time.time()
@@ -106,11 +118,11 @@ def get_interpolations_num(flow_root: str, scene_name: str, img_name: str, side:
         return 47, max_flow
 
 
-def load_cam_models(device: torch.device):
-    psf49 = torch.load('data/preprocess/learned_code/learned_code_27.pt').to(device)
-    psf25 = torch.load('data/preprocess/learned_code/learned_code_S25_27.pt').to(device)
-    cam49 = camera_model(psf49.shape).to(device)
-    cam25 = camera_model(psf25.shape).to(device)
+def load_cam_models(device: torch.device) -> ([camera_model], [Tensor]):
+    psf49: Tensor = torch.load('data/preprocess/learned_code/learned_code_27.pt').to(device)
+    psf25: Tensor = torch.load('data/preprocess/learned_code/learned_code_S25_27.pt').to(device)
+    cam49: camera_model = camera_model(psf49.shape).to(device)
+    cam25: camera_model = camera_model(psf25.shape).to(device)
     return [cam25, cam49], [psf25, psf49]
 
 
@@ -127,38 +139,3 @@ def apply_psf(cam: list, psfs: list, batch: torch.Tensor, nb_imgs: int, do_apply
     blurred_image = transforms.ToPILImage()(blurred_image).convert("RGB")
 
     return blurred_image
-
-
-def get_filenames_from_subfolders(root: str, side: str):
-    images_list = []
-    total_images_num = 0
-
-    if side == "right":
-        opp_side = "left"
-    else:
-        opp_side = "right"
-
-    for sub, dirs, files in os.walk(root):
-        # Discard the "right" dirs since no stereo is needed
-        if not dirs and opp_side not in sub:
-            file_list = [os.path.join(sub, f) for f in files]
-            file_list.sort()
-            images_list += [file_list]
-            # if 'train' in sub:
-            #     train_list += [file_list]
-            # else:
-            #     test_list += [file_list]
-            total_images_num += len(file_list)
-
-    print(f"Total number of images to process:{total_images_num}")
-    return images_list, total_images_num
-
-
-def get_filenames_by_extention(dir, files_extention: str):
-        files = []
-        for f in os.scandir(dir):
-            if f.is_file():
-                if files_extention in f.name:
-                    files.append(f.path)
-
-        return files

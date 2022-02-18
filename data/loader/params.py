@@ -1,5 +1,5 @@
 from data.type import Type
-from .sub_type import SubType
+from data.sub_type import SubType
 
 
 class DataLoaderParams:

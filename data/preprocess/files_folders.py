@@ -47,3 +47,33 @@ def create_scene_dir(target_root: str, filename: str, idx: int):
     Path(os.path.join(target_root, f"{scene_name}/left")).mkdir(parents=True, exist_ok=True)
     Path(os.path.join(target_root, f"{scene_name}/right")).mkdir(parents=True, exist_ok=True)
     return scene_name
+
+def get_filenames_from_subfolders(root: str, side: str):
+    images_list = []
+    total_images_num = 0
+
+    if side == "right":
+        opp_side = "left"
+    else:
+        opp_side = "right"
+
+    for sub, dirs, files in os.walk(root):
+        # Discard the "right" dirs since no stereo is needed
+        if not dirs and opp_side not in sub:
+            file_list = [os.path.join(sub, f) for f in files]
+            file_list.sort()
+            images_list += [file_list]
+            total_images_num += len(file_list)
+
+    print(f"Total number of images to process:{total_images_num}")
+    return images_list, total_images_num
+
+
+def get_filenames_by_extention(dir, files_extention: str):
+        files = []
+        for f in os.scandir(dir):
+            if f.is_file():
+                if files_extention in f.name:
+                    files.append(f.path)
+
+        return files

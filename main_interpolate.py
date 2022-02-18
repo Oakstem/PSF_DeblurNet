@@ -4,6 +4,7 @@ import argparse
 
 from data.load_data import load_data
 from data.preprocess.preprocess import apply_blur
+from data.sub_type import SubType
 from data.type import Type
 
 
@@ -25,10 +26,12 @@ def main():
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
     abs_path = "/home/jupyter/"
     type: Type = Type.MONKAA
+    sub_type: SubType = SubType.FUTURE_RIGHT
     #train_dataloader = load_data(abs_path, batch_size=5, train=True, shuffle=False, limit=0.9)
     #test_dataloader = load_data(abs_path, batch_size=5, train=False, shuffle=False, limit=0.9)
 
-    apply_blur(type, abs_path, start_scene_index=args.start_indx, target_size=args.sz, do_apply_gamma=args.gamm)
+    apply_blur(type, sub_type, abs_path, start_scene_index=args.start_indx, target_size=args.sz,
+               do_apply_gamma=args.gamm)
 
 
 if __name__ == "__main__":

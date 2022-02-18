@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from ..sub_type import SubType
+from data.sub_type import SubType
 from ...files_reader.pfm import read_pfm
 
 
