@@ -44,18 +44,18 @@ def apply_blur(type: Type, sub_type: SubType, data_path: str, start_scene_index:
         else:
             side = 'right'
         images_list, total_images_num = get_filenames_from_subfolders(rgb_root, side)
-        _apply_blur(target_root, flow_root, images_list, total_images_num, start_scene_index, resize, do_apply_gamma,
-                    side, device, cams, psfs)
+        _apply_blur_monkaa(target_root, flow_root, images_list, total_images_num, start_scene_index, resize,
+                           do_apply_gamma, side, device, cams, psfs)
     if type == Type.FLYING_CHAIRS2:
         files_left = get_filenames_by_extention(rgb_root, "-img_0.png")
         files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
 
 
-def _apply_blur(target_root: str, flow_root: str, images_list: [], total_images_num: int, start_scene_index: int,
-                resize: Resize, do_apply_gamma: bool, side: str, device: int or str, cams: [camera_model],
-                psfs: [Tensor]):
+def _apply_blur_monkaa(target_root: str, flow_root: str, images_list: [], total_images_num: int, start_scene_index: int,
+                       resize: Resize, do_apply_gamma: bool, side: str, device: int or str, cams: [camera_model],
+                       psfs: [Tensor]):
     processed_count = 0
-    cnt_prev = 0
+    prev_processed_count = 0
     t = time.time()
     for idx in range(start_scene_index, len(images_list)):
         scene_name = create_scene_dir(target_root, images_list[idx][0], idx)
@@ -86,8 +86,8 @@ def _apply_blur(target_root: str, flow_root: str, images_list: [], total_images_
                 if processed_count % 10 == 0:
                     elapsed = time.time() - t
                     print(f"Number of processed images: {processed_count}/{total_images_num}, scene index:{idx}, "
-                          f"time per image:{(elapsed / (processed_count - cnt_prev)):0.1f} sec")
-                    cnt_prev = processed_count
+                          f"time per image:{(elapsed / (processed_count - prev_processed_count)):0.1f} sec")
+                    prev_processed_count = processed_count
                     t = time.time()
 
 
