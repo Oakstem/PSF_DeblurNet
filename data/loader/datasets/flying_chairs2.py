@@ -7,17 +7,14 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from data.sub_type import SubType
-from ...files_reader.pfm import read_pfm
 
 
 class FlyingChairs2(Dataset):
-    BLURRED = "blurred"
-    OPTICAL_FLOW = "sm_optical_flow"
 
     def __init__(self, dataset_path: str, subtypes: [SubType], train: bool):
 
         slash = "\\" if os.name == "nt" else "/"
-        files_paths = os.path.join(dataset_path, "train" if train else "test") + slash
+        files_paths = os.path.join(dataset_path, "train" if train else "val") + slash
 
         self.subtype: SubType = subtypes
         self.img_size = 264
@@ -27,12 +24,14 @@ class FlyingChairs2(Dataset):
         files_optical: [] = None
         files_left = self.get_files(files_paths, "-img_0.png")
         files_right = self.get_files(files_paths, "-img_1.png")
+        files_blurred = self.get_files(files_paths, "-img_blurred.png")
         files_flo = self.get_files(files_paths, "-flow_01.flo")
         files_occ_weights = self.get_files(files_paths, "-occ_weights_01.pfm")
         files_mb_weights = self.get_files(files_paths, "-mb_weights_01.pfm")
+        files_mb = self.get_files(files_paths, "-mb_01.png")
 
         self.files_blurred: [] = files_left
-        self.files_optical: [] = files_occ_weights
+        self.files_optical: [] = files_mb
 
         print("aa")
 
@@ -52,17 +51,12 @@ class FlyingChairs2(Dataset):
             [transforms.ToTensor(), transforms.CenterCrop(self.img_size)])
         image_blurred_tensor: Tensor = transform(image_blurred)
 
-        transform = transforms.Compose(
-            [transforms.ToTensor(),
-             transforms.Resize((image_blurred_height, image_blurred_width)),
-             transforms.CenterCrop(self.img_size),
-             transforms.Normalize(mean=[0,0],std=[self.div_flow, self.div_flow])])
-             # transforms.CenterCrop(image_blurred_height), transforms.Normalize((0, 0), (5, 5))])
-
         image_optical_path = self.files_optical[index]
-        image_optical: ndarray = read_pfm(image_optical_path)[0][..., :2]
-        # image_optical = st.resize(image_optical, (image_blurred_height, image_blurred_width))
-        image_optical_tensor: Tensor = transform(image_optical.copy())
+        image_optical: ndarray = self.load_image(image_optical_path)
+
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.CenterCrop(self.img_size)])
+        image_optical_tensor: Tensor = transform(image_optical)
 
         return image_blurred_tensor, image_optical_tensor, index
 

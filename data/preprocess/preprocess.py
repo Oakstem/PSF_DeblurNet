@@ -14,7 +14,7 @@ from data.preprocess.debug import debug_interp_frames
 from data.preprocess.gamma import apply_gamma
 from data.preprocess.interpolations.interpolations import get_interpolations
 from data.preprocess.files_folders import get_dataset_path, get_blurred_image_path, create_scene_dir, \
-    get_filenames_from_subfolders, get_filenames_by_extention
+    get_filenames_from_subfolders, get_filenames_by_extention, get_image_name
 from data.sub_type import SubType
 from data.type import Type
 
@@ -49,6 +49,8 @@ def apply_blur(type: Type, sub_type: SubType, data_path: str, start_scene_index:
     if type == Type.FLYING_CHAIRS2:
         files_left = get_filenames_by_extention(rgb_root, "-img_0.png")
         files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
+        _apply_blur_flying_chairs(target_root, flow_root, files_left, files_right, len(files_left), start_scene_index,
+                                  resize, do_apply_gamma, device, cams, psfs)
 
 
 def _apply_blur_monkaa(target_root: str, flow_root: str, images_list: [], total_images_num: int, start_scene_index: int,
@@ -93,7 +95,7 @@ def _apply_blur_monkaa(target_root: str, flow_root: str, images_list: [], total_
 
 def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left: [], images_list_right: [],
                               total_images_num: int, start_scene_index: int, resize: Resize, do_apply_gamma: bool,
-                              side: str, device: int or str, cams: [camera_model], psfs: [Tensor]):
+                              device: int or str, cams: [camera_model], psfs: [Tensor]):
     processed_count = 0
     prev_processed_count = 0
     t = time.time()
@@ -102,10 +104,12 @@ def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left
         image_right = images_list_right[idx]
 
         # Get blurred img path
-        blur_path, image_name = get_blurred_image_path(target_root, scene_name, img, side)
+        image_blur = image_left[:-4] + "_blurred.img"
+        image_flo = image_left[:-4] + ".flo"
+        image_pfm = image_left[:-10] + "-mb_01.pfm"
 
         # Get the OF
-        num_images, _ = get_interpolations_num_flying_chairs(flow_root, blur_path, image_name)
+        num_images, _ = get_interpolations_num_flying_chairs(image_flo)
 
         if num_images is not None:
             if device == torch.device("cuda"):
@@ -117,7 +121,7 @@ def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left
             # Apply the suitable PSF conv
             blurred_image = apply_psf(cams, psfs, batch, num_images, do_apply_gamma)
             # Save results to /blurred  directory
-            blurred_image.save(blur_path)
+            blurred_image.save(image_blur)
 
             processed_count += 1
             if processed_count % 10 == 0:
@@ -142,13 +146,9 @@ def get_interpolations_num_monkaa(flow_root: str, scene_name: str, img_name: str
     return _get_interpolations_num(optical_flow_file_path, min_nb, max_pxl_step, scale_reduct)
 
 
-def get_interpolations_num_flying_chairs(flow_root: str, folder_name: str, img_name: str, min_nb: int = 5,
+def get_interpolations_num_flying_chairs(image_pfm: str, min_nb: int = 5,
                                          max_pxl_step: int = 170, scale_reduct: int = 2):
-    # Find L2 distance of flow movement, if within threshold, return number of frame interpolation
-    pfm_file_name = f"{img_name[:-4]}.pfm"
-    optical_flow_file_path = os.path.join(flow_root, folder_name, pfm_file_name)
-
-    return _get_interpolations_num(optical_flow_file_path, min_nb, max_pxl_step, scale_reduct)
+    return _get_interpolations_num(image_pfm, min_nb, max_pxl_step, scale_reduct)
 
 
 def _get_interpolations_num(optical_flow_file_path: str, min_nb: int = 5, max_pxl_step: int = 170,

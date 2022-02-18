@@ -28,13 +28,17 @@ def get_dataset_path(type: Type, data_path: str):
 
 
 def get_blurred_image_path(target_root: str, scene_name: str, filename: str, side: str):
-    if len(filename.split("/")) > len(filename.split("\\")):
-        img_name = filename.split("/")[-1]
-    else:
-        img_name = filename.split("\\")[-1]
-    blr_path = os.path.join(target_root, f"{scene_name}/{side}/{img_name}")
-    return blr_path, img_name
+    image_name: str = get_image_name(filename)
+    blurr_path = os.path.join(target_root, f"{scene_name}/{side}/{image_name}")
+    return blurr_path, image_name
 
+def get_image_name(filename: str):
+    if len(filename.split("/")) > len(filename.split("\\")):
+        image_name = filename.split("/")[-1]
+    else:
+        image_name = filename.split("\\")[-1]
+
+    return image_name
 
 def create_scene_dir(target_root: str, filename: str, idx: int):
     # Windows / Linux environment different paths
