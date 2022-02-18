@@ -96,8 +96,8 @@ def get_interpolations_num(flow_root: str, scene_name: str, img_name: str, side:
 
 
 def load_cam_models(device: torch.device):
-    psf49 = torch.load('data/learned_code_27.pt').to(device)
-    psf25 = torch.load('data/learned_code_S25_27.pt').to(device)
+    psf49 = torch.load('data/preprocess/learned_code/learned_code_27.pt').to(device)
+    psf25 = torch.load('data/preprocess/learned_code/learned_code_S25_27.pt').to(device)
     cam49 = camera_model(psf49.shape).to(device)
     cam25 = camera_model(psf25.shape).to(device)
     return [cam25, cam49], [psf25, psf49]
