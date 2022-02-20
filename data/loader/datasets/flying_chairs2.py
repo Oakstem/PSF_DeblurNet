@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from data.sub_type import SubType
+from data.files_reader.flo import read_flo2
 
 
 class FlyingChairs2(Dataset):
@@ -31,9 +32,7 @@ class FlyingChairs2(Dataset):
         files_mb = self.get_files(files_paths, "-mb_01.png")
 
         self.files_blurred: [] = files_left
-        self.files_optical: [] = files_mb
-
-        print("aa")
+        self.files_optical: [] = files_flo
 
     def __len__(self):
         return len(self.files_blurred)
@@ -51,12 +50,15 @@ class FlyingChairs2(Dataset):
             [transforms.ToTensor(), transforms.CenterCrop(self.img_size)])
         image_blurred_tensor: Tensor = transform(image_blurred)
 
-        image_optical_path = self.files_optical[index]
-        image_optical: ndarray = self.load_image(image_optical_path)
-
         transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.CenterCrop(self.img_size)])
-        image_optical_tensor: Tensor = transform(image_optical)
+            [transforms.ToTensor(),
+             transforms.Resize((image_blurred_height, image_blurred_width)),
+             transforms.CenterCrop(self.img_size)])
+             #transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
+
+        image_optical_path = self.files_optical[index]
+        image_optical: ndarray = read_flo2(self.files_flo[index])[0][..., :2]
+        image_optical_tensor: Tensor = transform(image_optical.copy())
 
         return image_blurred_tensor, image_optical_tensor, index
 

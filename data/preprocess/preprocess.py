@@ -1,3 +1,4 @@
+import copy
 import time
 import torch
 import numpy as np
@@ -17,6 +18,7 @@ from data.preprocess.files_folders import get_dataset_path, get_blurred_image_pa
     get_filenames_from_subfolders, get_filenames_by_extention, get_image_name
 from data.sub_type import SubType
 from data.type import Type
+from data.files_reader.flo import *
 
 NUM_GT_IN_BATCH = 2
 
@@ -48,7 +50,10 @@ def apply_blur(type: Type, sub_type: SubType, data_path: str, start_scene_index:
                            do_apply_gamma, side, device, cams, psfs)
     if type == Type.FLYING_CHAIRS2:
         files_left = get_filenames_by_extention(rgb_root, "-img_0.png")
-        files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
+        files_right = copy.deepcopy(files_left)
+        for idx, _ in enumerate(files_right):
+            files_right[idx] = files_right[idx].replace("img_0", "img_1")
+        #files_right = get_filenames_by_extention(rgb_root, "-img_1.png")
         _apply_blur_flying_chairs(target_root, flow_root, files_left, files_right, len(files_left), start_scene_index,
                                   resize, do_apply_gamma, device, cams, psfs)
 
@@ -104,8 +109,8 @@ def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left
         image_right = images_list_right[idx]
 
         # Get blurred img path
-        image_blur = image_left[:-4] + "_blurred.img"
-        image_flo = image_left[:-4] + ".flo"
+        image_blur = image_left[:-6] + "_blurred.png"
+        image_flo = image_left[:-10] + "-flow_01.flo"
         image_pfm = image_left[:-10] + "-mb_01.pfm"
 
         # Get the OF
@@ -153,7 +158,7 @@ def get_interpolations_num_flying_chairs(image_pfm: str, min_nb: int = 5,
 
 def _get_interpolations_num(optical_flow_file_path: str, min_nb: int = 5, max_pxl_step: int = 170,
                             scale_reduct: int = 2):
-    optical_flow = read_pfm(optical_flow_file_path)[0]
+    optical_flow = read_flo2(optical_flow_file_path)[0]
 
     distance = np.sqrt(optical_flow[..., 0]**2+optical_flow[..., 1]**2)
     step_size = np.max(distance)

@@ -25,8 +25,8 @@ def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     abs_path = os.path.abspath(os.path.join(os.curdir, ".."))
     abs_path = "/home/jupyter/"
-    type: Type = Type.MONKAA
-    sub_type: SubType = SubType.FUTURE_RIGHT
+    type: Type = Type.FLYING_CHAIRS2
+    sub_type: SubType = SubType.NOT_RELEVANT
     #train_dataloader = load_data(abs_path, batch_size=5, train=True, shuffle=False, limit=0.9)
     #test_dataloader = load_data(abs_path, batch_size=5, train=False, shuffle=False, limit=0.9)
 
