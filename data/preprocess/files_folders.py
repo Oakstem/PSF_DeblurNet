@@ -4,7 +4,7 @@ from pathlib import Path
 from data.type import Type
 
 
-def get_dataset_path(type: Type, data_path: str):
+def get_dataset_path(type: Type, data_path: str, train: bool):
     if type == Type.MONKAA:
         data_path = os.path.join(data_path, "Monkaa")
         target_root = os.path.join(data_path, 'blurred_test')
@@ -12,9 +12,9 @@ def get_dataset_path(type: Type, data_path: str):
         rgb_root = os.path.join(data_path, 'frames_cleanpass')
     elif type == Type.FLYING_CHAIRS2:
         data_path = os.path.join(data_path, "FlyingChairs2")
-        target_root = os.path.join(data_path, 'train')
-        flow_root = os.path.join(data_path, 'train')
-        rgb_root = os.path.join(data_path, 'train')
+        target_root = os.path.join(data_path, 'train' if train else 'val')
+        flow_root = os.path.join(data_path, 'train' if train else 'val')
+        rgb_root = os.path.join(data_path, 'train' if train else 'val')
     else:
         target_root = ""
         flow_root = ""

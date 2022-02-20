@@ -23,9 +23,9 @@ from data.files_reader.flo import read_flo
 NUM_GT_IN_BATCH = 2
 
 
-def apply_blur(type: Type, sub_type: SubType, data_path: str, start_scene_index: int = 0,
+def apply_blur(type: Type, sub_type: SubType, data_path: str, train: bool, start_scene_index: int = 0,
                target_size: list = [270, 480], do_apply_gamma: bool = True):
-    target_root, flow_root, rgb_root = get_dataset_path(type, data_path)
+    target_root, flow_root, rgb_root = get_dataset_path(type, data_path, train)
     print(f"Target_root:{target_root}")
     if target_root is None:
         return

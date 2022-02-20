@@ -1,3 +1,4 @@
+import copy
 import os
 import os.path
 import cv2
@@ -23,15 +24,18 @@ class FlyingChairs2(Dataset):
         # In case you want to limit training to a smaller dataset
         files_blurred: [] = None
         files_optical: [] = None
-        files_left = self.get_files(files_paths, "-img_0.png")
-        files_right = self.get_files(files_paths, "-img_1.png")
+        #files_left = self.get_files(files_paths, "-img_0.png")
+        #files_right = self.get_files(files_paths, "-img_1.png")
         files_blurred = self.get_files(files_paths, "-img_blurred.png")
-        files_flo = self.get_files(files_paths, "-flow_01.flo")
-        files_occ_weights = self.get_files(files_paths, "-occ_weights_01.pfm")
-        files_mb_weights = self.get_files(files_paths, "-mb_weights_01.pfm")
-        files_mb = self.get_files(files_paths, "-mb_01.png")
+        files_flo = copy.deepcopy(files_blurred)
+        for idx, _ in enumerate(files_flo):
+            files_flo[idx] = files_flo[idx].replace("-img_blurred.png", "-flow_01.flo")
+        #files_flo = self.get_files(files_paths, "-flow_01.flo")
+        #files_occ_weights = self.get_files(files_paths, "-occ_weights_01.pfm")
+        #files_mb_weights = self.get_files(files_paths, "-mb_weights_01.pfm")
+        #files_mb = self.get_files(files_paths, "-mb_01.png")
 
-        self.files_blurred: [] = files_left
+        self.files_blurred: [] = files_blurred
         self.files_optical: [] = files_flo
 
     def __len__(self):
@@ -57,7 +61,7 @@ class FlyingChairs2(Dataset):
              #transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
 
         image_optical_path = self.files_optical[index]
-        image_optical: ndarray = read_flo(self.files_flo[index])[0][..., :2]
+        image_optical: ndarray = read_flo(self.files_optical[index])[0][..., :2]
         image_optical_tensor: Tensor = transform(image_optical.copy())
 
         return image_blurred_tensor, image_optical_tensor, index

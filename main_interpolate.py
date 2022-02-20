@@ -27,10 +27,11 @@ def main():
     abs_path = "/home/jupyter/"
     type: Type = Type.FLYING_CHAIRS2
     sub_type: SubType = SubType.NOT_RELEVANT
+    train: bool = True
     #train_dataloader = load_data(abs_path, batch_size=5, train=True, shuffle=False, limit=0.9)
     #test_dataloader = load_data(abs_path, batch_size=5, train=False, shuffle=False, limit=0.9)
 
-    apply_blur(type, sub_type, abs_path, start_scene_index=args.start_indx, target_size=args.sz,
+    apply_blur(type, sub_type, abs_path, train, start_scene_index=args.start_indx, target_size=args.sz,
                do_apply_gamma=args.gamm)
 
 
