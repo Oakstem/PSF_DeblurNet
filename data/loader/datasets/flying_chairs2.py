@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from data.sub_type import SubType
-from data.files_reader.flo import read_flo2
+from data.files_reader.flo import read_flo
 
 
 class FlyingChairs2(Dataset):
@@ -57,7 +57,7 @@ class FlyingChairs2(Dataset):
              #transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
 
         image_optical_path = self.files_optical[index]
-        image_optical: ndarray = read_flo2(self.files_flo[index])[0][..., :2]
+        image_optical: ndarray = read_flo(self.files_flo[index])[0][..., :2]
         image_optical_tensor: Tensor = transform(image_optical.copy())
 
         return image_blurred_tensor, image_optical_tensor, index

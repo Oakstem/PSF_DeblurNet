@@ -18,7 +18,7 @@ from data.preprocess.files_folders import get_dataset_path, get_blurred_image_pa
     get_filenames_from_subfolders, get_filenames_by_extention, get_image_name
 from data.sub_type import SubType
 from data.type import Type
-from data.files_reader.flo import *
+from data.files_reader.flo import read_flo
 
 NUM_GT_IN_BATCH = 2
 
@@ -158,7 +158,7 @@ def get_interpolations_num_flying_chairs(image_pfm: str, min_nb: int = 5,
 
 def _get_interpolations_num(optical_flow_file_path: str, min_nb: int = 5, max_pxl_step: int = 170,
                             scale_reduct: int = 2):
-    optical_flow = read_flo2(optical_flow_file_path)[0]
+    optical_flow = read_flo(optical_flow_file_path)[0]
 
     distance = np.sqrt(optical_flow[..., 0]**2+optical_flow[..., 1]**2)
     step_size = np.max(distance)
