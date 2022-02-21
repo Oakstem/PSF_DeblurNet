@@ -110,8 +110,9 @@ def _apply_blur_flying_chairs(target_root: str, flow_root: str, images_list_left
 
         # Get blurred img path
         image_blur = image_left[:-6] + "_blurred.png"
+        if os.path.exists(image_blur):
+            continue
         image_flo = image_left[:-10] + "-flow_01.flo"
-        image_pfm = image_left[:-10] + "-mb_01.pfm"
 
         # Get the OF
         num_images, _ = get_interpolations_num_flying_chairs(image_flo)
