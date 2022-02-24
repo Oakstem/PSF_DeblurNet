@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 
-from main_train_flownet_args_parser import parse_arguments
+from main_train_args_parser import parse_arguments
 from data.load_data import load_data
 from FlowNetPytorch.models.Framing import GoWithTheFlownet
 from FlowNetPytorch.models.raft import RAFT
@@ -70,14 +70,14 @@ def main():
     train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit)
     val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model = GoWithTheFlownet(device)
-    model.to(device)
+    model_flownet = GoWithTheFlownet(device)
+    model_flownet.to(device)
 
     # create model
     if args.pretrained:
         network_data = torch.load(os.path.join("checkpoints", args.pretrained), map_location=device)
         args.arch = network_data['arch']
-        model.load_state_dict(network_data['state_dict'])
+        model_flownet.load_state_dict(network_data['state_dict'])
         print("=> using pre-trained model '{}'".format(args.arch))
     else:
         network_data = None
@@ -87,21 +87,21 @@ def main():
 
     args.small = True
     args.mixed_precision = False
-    raft_model = torch.nn.DataParallel(RAFT(args))
-    raft_model.load_state_dict(torch.load("models/raft-small.pth", map_location=device))
+    model_raft = torch.nn.DataParallel(RAFT(args))
+    model_raft.load_state_dict(torch.load("models/raft-small.pth", map_location=device))
 
-    raft_model = raft_model.module
-    raft_model.to(device)
-    raft_model.eval()
+    model_raft = model_raft.module
+    model_raft.to(device)
+    model_raft.eval()
 
     assert(args.solver in ['adam', 'sgd'])
     print('=> setting {} solver'.format(args.solver))
     # param_groups = [{'params': model.bias_parameters(), 'weight_decay': args.bias_decay},
     #                 {'params': model.weight_parameters(), 'weight_decay': args.weight_decay}]
-    param_groups = [{'params': model.parameters(), 'weight_decay': args.weight_decay}]
+    param_groups = [{'params': model_flownet.parameters(), 'weight_decay': args.weight_decay}]
 
     if device.type == "cuda":
-        model = torch.nn.DataParallel(model).cuda()
+        model_flownet = torch.nn.DataParallel(model_flownet).cuda()
         cudnn.benchmark = True
 
     optimizer: torch.optim.Optimizer = None
@@ -137,13 +137,13 @@ def main():
 
             # train_loss, train_EPE, experiment = train(train_loader, model, optimizer, epoch, train_writer, experiment)
         if not args.evaluate:
-            experiment = train(train_loader, model, raft_model, optimizer, epoch, train_writer, experiment)
+            experiment = train(train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment)
         # train_writer.add_scalar('mean EPE', train_EPE, epoch)
 
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(val_loader, model, raft_model, epoch, output_writers, experiment)
+            experiment, EPE = validate(val_loader, model_flownet, model_raft, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -155,14 +155,14 @@ def main():
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': args.arch,
-            'state_dict': model.module.state_dict(),
+            'state_dict': model_flownet.module.state_dict(),
             # 'best_EPE': best_EPE,
             'div_flow': args.div_flow
         }, is_best=is_best, save_path=save_path)
 
 
 
-def train(train_loader, model, flow_model, optimizer, epoch, train_writer, experiment):
+def train(train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment):
     global n_iter, args
     # batch_time = AverageMeter()
     # data_time = AverageMeter()
@@ -172,11 +172,12 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
     epoch_size = len(train_loader) if args.epoch_size == 0 else min(len(train_loader), args.epoch_size)
 
     # switch to train mode
-    model = model.module
-    model.train()
-    model = model.to(device)
-    flow_model.eval()
-    flow_model = flow_model.to(device)
+    model_flownet = model_flownet.module
+    model_flownet.train()
+    model_flownet = model_flownet.to(device)
+
+    model_raft.eval()
+    model_raft = model_raft.to(device)
 
     criterion = SmoothL1Loss()
     end = time.time()
@@ -192,8 +193,8 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
             input = input.to(device)
 
             # compute output
-            frame1, frame2 = model(input)
-            flow = flow_model(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+            frame1, frame2 = model_flownet(input)
+            flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
             sm_tgt = tr_f.resize(target, flow[0].shape[-1])
             loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
             loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
@@ -230,7 +231,6 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
             # batch_time.update(time.time() - end)
             # end = time.time()
 
-
             pbar.update(input.shape[0])
             experiment.log({
                 'train loss': tot_loss/(i+1),
@@ -249,17 +249,19 @@ def train(train_loader, model, flow_model, optimizer, epoch, train_writer, exper
     return experiment
 
 
-def validate(val_loader, model, flow_model, epoch, output_writers, experiment):
+def validate(val_loader, model_flownet, model_raft, epoch, output_writers, experiment):
     global args
 
     # batch_time = AverageMeter()
     # flow2_EPEs = AverageMeter()
 
     # switch to evaluate mode
-    model.eval()
-    flow_model.eval()
-    model.to(device)
-    flow_model.to(device)
+    model_flownet.eval()
+    model_raft.eval()
+
+    model_flownet.to(device)
+    model_raft.to(device)
+
     criterion = SmoothL1Loss()
     loss_weights = [0.20, 0.35, 0.45]
     tot_loss = 0
@@ -269,8 +271,8 @@ def validate(val_loader, model, flow_model, epoch, output_writers, experiment):
         input = input.to(device)
 
         # compute output
-        frame1, frame2 = model(input)
-        flow = flow_model(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+        frame1, frame2 = model_flownet(input)
+        flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
         sm_tgt = tr_f.resize(target, flow[0].shape[-1])
         loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
         loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)

@@ -51,7 +51,7 @@ Default HyperParameters provided in `main.py` are the same as in the caffe train
 * Example usage for FlowNetS :
 
 ```bash
-python main_train_flownet.py /path/to/flying_chairs/ -b8 -j8 -a flownets
+python main_train.py /path/to/flying_chairs/ -b8 -j8 -a flownets
 ```
 
 We recommend you set j (number of data threads) to high if you use DataAugmentation as to avoid data loading to slow the training.
@@ -59,7 +59,7 @@ We recommend you set j (number of data threads) to high if you use DataAugmentat
 For further help you can type
 
 ```bash
-python main_train_flownet.py -h
+python main_train.py -h
 ```
 
 ## Visualizing training
@@ -87,7 +87,7 @@ tensorboard --logdir=/path/to/checkoints
 
 Prediction are made by FlowNetS.
 
-Exact code for Optical Flow -> Color map can be found [here](../main_train_flownet.py#L321)
+Exact code for Optical Flow -> Color map can be found [here](../main_train.py#L321)
 
 | Input | prediction | GroundTruth |
 |-------|------------|-------------|
