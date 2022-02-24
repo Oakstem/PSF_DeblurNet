@@ -13,12 +13,12 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 
-from FlowNetPytorch.args_parser import parse_arguments
+from main_train_flownet_args_parser import parse_arguments
 from data.load_data import load_data
-from models.Framing import GoWithTheFlownet
-from models.raft import RAFT
+from FlowNetPytorch.models.Framing import GoWithTheFlownet
+from FlowNetPytorch.models.raft import RAFT
 import datetime
-from util import flow2rgb, save_checkpoint
+from FlowNetPytorch.util import flow2rgb, save_checkpoint
 from torch.nn import SmoothL1Loss
 
 
