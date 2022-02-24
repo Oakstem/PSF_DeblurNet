@@ -4,16 +4,16 @@ from path import Path
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn.functional as F
-import models
+import FlowNetPytorch.models
 from tqdm import tqdm
 
 import torchvision.transforms as transforms
 from data import flow_transforms
 from imageio import imread, imwrite
 import numpy as np
-from util import flow2rgb
+from FlowNetPytorch.util import flow2rgb
 
-model_names = sorted(name for name in models.__dict__
+model_names = sorted(name for name in FlowNetPytorch.models.__dict__
                      if name.islower() and not name.startswith("__"))
 
 
@@ -79,7 +79,7 @@ def main():
     # create model
     network_data = torch.load(args.pretrained)
     print("=> using pre-trained model '{}'".format(network_data['arch']))
-    model = models.__dict__[network_data['arch']](network_data).to(device)
+    model = FlowNetPytorch.models.__dict__[network_data['arch']](network_data).to(device)
     model.eval()
     cudnn.benchmark = True
 
