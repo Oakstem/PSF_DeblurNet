@@ -1,8 +1,9 @@
 import os.path
 import glob
+
+from .flow_transforms import CenterCrop
 from .listdataset import ListDataset
 from .util import split2list
-import flow_transforms
 
 '''
 Dataset routines for MPI Sintel.
@@ -40,7 +41,7 @@ def mpi_sintel_clean(root, transform=None, target_transform=None,
                      co_transform=None, split=None):
     train_list, test_list = make_dataset(root, split, 'clean')
     train_dataset = ListDataset(root, train_list, transform, target_transform, co_transform)
-    test_dataset = ListDataset(root, test_list, transform, target_transform, flow_transforms.CenterCrop((384,1024)))
+    test_dataset = ListDataset(root, test_list, transform, target_transform, CenterCrop((384,1024)))
 
     return train_dataset, test_dataset
 
@@ -49,7 +50,7 @@ def mpi_sintel_final(root, transform=None, target_transform=None,
                      co_transform=None, split=None):
     train_list, test_list = make_dataset(root, split, 'final')
     train_dataset = ListDataset(root, train_list, transform, target_transform, co_transform)
-    test_dataset = ListDataset(root, test_list, transform, target_transform, flow_transforms.CenterCrop((384,1024)))
+    test_dataset = ListDataset(root, test_list, transform, target_transform, CenterCrop((384,1024)))
 
     return train_dataset, test_dataset
 
@@ -66,6 +67,6 @@ def mpi_sintel_both(root, transform=None, target_transform=None,
     train_list2, test_list2 = make_dataset(root, split, 'final')
     train_dataset = ListDataset(root, train_list1 + train_list2, transform, target_transform, co_transform)
     test_dataset = ListDataset(root, test_list1 + test_list2, transform, target_transform,
-                               flow_transforms.CenterCrop((384,1024)))
+                               CenterCrop((384,1024)))
 
     return train_dataset, test_dataset

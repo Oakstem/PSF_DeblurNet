@@ -1,10 +1,11 @@
 from __future__ import division
 import os.path
 import glob
+
+from .flow_transforms import CenterCrop
 from .listdataset import ListDataset
 from .util import split2list
 import numpy as np
-import flow_transforms
 
 try:
     import cv2
@@ -75,7 +76,7 @@ def KITTI_occ(root, transform=None, target_transform=None,
                                 loader=KITTI_loader)
     # All test sample are cropped to lowest possible size of KITTI images
     test_dataset = ListDataset(root, test_list, transform,
-                               target_transform, flow_transforms.CenterCrop((370,1224)),
+                               target_transform, CenterCrop((370,1224)),
                                loader=KITTI_loader)
 
     return train_dataset, test_dataset
