@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from models.STNModule import SpatialTransformer
+from .STNModule import SpatialTransformer
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
-from models.util import conv, conv_block, predict_flow, deconv, crop_like, correlate
+from .util import conv, conv_block, predict_flow, deconv, crop_like, correlate
 
 
 class GoWithTheFlownet(nn.Module):
