@@ -8,7 +8,7 @@ import models
 from tqdm import tqdm
 
 import torchvision.transforms as transforms
-import flow_transforms
+from data import flow_transforms
 from imageio import imread, imwrite
 import numpy as np
 from util import flow2rgb
