@@ -14,12 +14,13 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
+
+import data
 import flow_transforms
 import models
+from data.load_data import load_data
 from models.Framing import GoWithTheFlownet
 from models.raft import RAFT
-import datasets
-from datasets.load_data import load_data
 from multiscaleloss import multiscaleEPE, realEPE
 import datetime
 from torch.utils.tensorboard import SummaryWriter
@@ -29,7 +30,7 @@ from torch.nn import SmoothL1Loss
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__"))
-dataset_names = sorted(name for name in datasets.__all__)
+dataset_names = sorted(name for name in data.__all__)
 
 parser = argparse.ArgumentParser(description='PyTorch FlowNet Training on several datasets',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
