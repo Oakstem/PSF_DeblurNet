@@ -1,9 +1,0 @@
-*.pyc
-__pycache__/
-checkpoints/
-wandb/
-*.pth
-*.jpg
-venv/
-.idea/
-*.keep

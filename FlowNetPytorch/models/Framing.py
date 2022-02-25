@@ -75,8 +75,10 @@ class Decoder(nn.Module):
         self.dec6_torgb = conv_block(batchNorm, enc_features[4], 3)
         self.dec5_torgb = conv(batchNorm, enc_features[3], 3)
         self.dec4_torgb = conv(batchNorm, enc_features[2], 3)
-        self.dec3_torgb = conv(batchNorm, enc_features[1], 3)
+        # self.dec3_torgb = conv(batchNorm, enc_features[1], 3)
         self.dec2_torgb = conv(batchNorm, enc_features[0], 3)
+
+        self.dec3_torgb_up = deconv(enc_features[1], 3)
 
         self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
@@ -107,7 +109,7 @@ class Decoder(nn.Module):
 
         dec3 = self.decoders[2](torch.cat((encs[2], trs[2], dec_up4), dim=1))
         dec_up3 = crop_like(self.dec3_up(dec3), encs[1])
-        dec_rgb3 = self.dec3_torgb(dec_up3)
+        dec_rgb3 = self.dec3_torgb_up(dec_up3)
         if dec_rgb3.shape[-1]/8 != dec_rgb3.shape[-1]//8:
             sz = 8*(dec_rgb3.shape[-1]//8)
             dec_rgb3 = dec_rgb3[:,:,:sz,:sz]

@@ -24,7 +24,6 @@ from torch.nn import SmoothL1Loss
 
 best_EPE = -1
 n_iter = int(0)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def main():
@@ -34,7 +33,7 @@ def main():
         data_path = "/content/drive/MyDrive/test_chairs"
     except:
         data_path = "G:/My Drive/Colab Notebooks/test_chairs"
-        data_path = "/home/jupyter/"
+        # data_path = "/home/jupyter/"
 
     args: argparse.Namespace = parse_arguments()
 
@@ -69,13 +68,13 @@ def main():
 
     train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit)
     val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit)
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model_flownet = GoWithTheFlownet(device)
-    model_flownet.to(device)
+    args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model_flownet = GoWithTheFlownet(args.device)
+    model_flownet.to(args.device)
 
     # create model
     if args.pretrained:
-        network_data = torch.load(os.path.join("checkpoints", args.pretrained), map_location=device)
+        network_data = torch.load(os.path.join("FlowNetPytorch", "checkpoints", args.pretrained), map_location=args.device)
         args.arch = network_data['arch']
         model_flownet.load_state_dict(network_data['state_dict'])
         print("=> using pre-trained model '{}'".format(args.arch))
@@ -83,15 +82,16 @@ def main():
         network_data = None
         print("=> creating model '{}'".format(args.arch))
 
-    # model = models.__dict__[args.arch](network_data).to(device)
+    # model = models.__dict__[args.arch](network_data).to(args.device)
 
     args.small = True
     args.mixed_precision = False
     model_raft = torch.nn.DataParallel(RAFT(args))
-    model_raft.load_state_dict(torch.load("models/raft-small.pth", map_location=device))
+    model_raft.load_state_dict(torch.load(
+        os.path.join("FlowNetPytorch", "models", "raft-small.pth"), map_location=args.device))
 
     model_raft = model_raft.module
-    model_raft.to(device)
+    model_raft.to(args.device)
     model_raft.eval()
 
     assert(args.solver in ['adam', 'sgd'])
@@ -100,7 +100,7 @@ def main():
     #                 {'params': model.weight_parameters(), 'weight_decay': args.weight_decay}]
     param_groups = [{'params': model_flownet.parameters(), 'weight_decay': args.weight_decay}]
 
-    if device.type == "cuda":
+    if args.device.type == "cuda":
         model_flownet = torch.nn.DataParallel(model_flownet).cuda()
         cudnn.benchmark = True
 
@@ -126,7 +126,7 @@ def main():
                 Training size:   {len(train_loader) * args.batch_size}
                 Validation size: {len(val_loader) * args.batch_size}
                 Checkpoints:     {True}
-                Device:          {device.type}
+                Device:          {args.device.type}
                 Images scaling:  {1}
                 Mixed Precision: {False}
             ''')
@@ -137,13 +137,13 @@ def main():
 
             # train_loss, train_EPE, experiment = train(train_loader, model, optimizer, epoch, train_writer, experiment)
         if not args.evaluate:
-            experiment = train(train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment)
+            experiment = train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment)
         # train_writer.add_scalar('mean EPE', train_EPE, epoch)
 
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(val_loader, model_flownet, model_raft, epoch, output_writers, experiment)
+            experiment, EPE = validate(args, val_loader, model_flownet, model_raft, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -162,8 +162,8 @@ def main():
 
 
 
-def train(train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment):
-    global n_iter, args
+def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment):
+    global n_iter
     # batch_time = AverageMeter()
     # data_time = AverageMeter()
     # losses = AverageMeter()
@@ -172,12 +172,15 @@ def train(train_loader, model_flownet, model_raft, optimizer, epoch, train_write
     epoch_size = len(train_loader) if args.epoch_size == 0 else min(len(train_loader), args.epoch_size)
 
     # switch to train mode
-    model_flownet = model_flownet.module
+    try:
+        model_flownet = model_flownet.module
+    except:
+        None
     model_flownet.train()
-    model_flownet = model_flownet.to(device)
+    model_flownet = model_flownet.to(args.device)
 
     model_raft.eval()
-    model_raft = model_raft.to(device)
+    model_raft = model_raft.to(args.device)
 
     criterion = SmoothL1Loss()
     end = time.time()
@@ -188,17 +191,32 @@ def train(train_loader, model_flownet, model_raft, optimizer, epoch, train_write
         for i, (input, target, idx) in enumerate(train_loader):
             # measure data loading time
             # data_time.update(time.time() - end)
-            target = target.to(device)
-            # input = torch.cat(input,1).to(device)
-            input = input.to(device)
+            target = target.to(args.device)
+            # input = torch.cat(input,1).to(args.device)
+            input = input.to(args.device)
 
             # compute output
             frame1, frame2 = model_flownet(input)
             flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+            flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
+            flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
+
             sm_tgt = tr_f.resize(target, flow[0].shape[-1])
-            loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
-            loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
-            loss = loss1 + loss2
+            sm_tgt2 = tr_f.resize(target, flow2[0].shape[-1])
+            target2 = tr_f.resize(target, flow2[1].shape[-1])
+            sm_tgt3 = tr_f.resize(target, flow3[0].shape[-1])
+            target3 = tr_f.resize(target, flow3[1].shape[-1])
+
+            loss1_1 = loss_weights[0] * args.div_flow * criterion(flow[0], sm_tgt)
+            loss2_1 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
+
+            loss1_2 = loss_weights[1] * args.div_flow * criterion(flow2[0], sm_tgt2)
+            loss2_2 = loss_weights[1] * args.div_flow * criterion(flow2[1], target2)
+
+            loss1_3 = loss_weights[2] * args.div_flow * criterion(flow3[0], sm_tgt3)
+            loss2_3 = loss_weights[2] * args.div_flow * criterion(flow3[1], target3)
+
+            loss = loss1_1 + loss2_1 + loss1_2 + loss2_2 + loss1_3 + loss2_3
             tot_loss += loss.item()
             # print(f"Actual Loss:{loss}")
             # for ind in range(len(frame1)):
@@ -249,8 +267,7 @@ def train(train_loader, model_flownet, model_raft, optimizer, epoch, train_write
     return experiment
 
 
-def validate(val_loader, model_flownet, model_raft, epoch, output_writers, experiment):
-    global args
+def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers, experiment):
 
     # batch_time = AverageMeter()
     # flow2_EPEs = AverageMeter()
@@ -259,16 +276,16 @@ def validate(val_loader, model_flownet, model_raft, epoch, output_writers, exper
     model_flownet.eval()
     model_raft.eval()
 
-    model_flownet.to(device)
-    model_raft.to(device)
+    model_flownet.to(args.device)
+    model_raft.to(args.device)
 
     criterion = SmoothL1Loss()
     loss_weights = [0.20, 0.35, 0.45]
     tot_loss = 0
     for i, (input, target, idx) in enumerate(val_loader):
-        target = target.to(device)
-        # input = torch.cat(input,1).to(device)
-        input = input.to(device)
+        target = target.to(args.device)
+        # input = torch.cat(input,1).to(args.device)
+        input = input.to(args.device)
 
         # compute output
         frame1, frame2 = model_flownet(input)
