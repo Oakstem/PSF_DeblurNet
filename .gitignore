@@ -139,4 +139,6 @@ FlowNetPytorch/LICENSE
 flownet2-pytorch/
 RAFT/
 *.tar
+wandb/
+
 
