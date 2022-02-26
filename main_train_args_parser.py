@@ -69,7 +69,7 @@ def parse_arguments():
                         metavar='N', help='print frequency')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', dest='pretrained', default="checkpoint.pth.tar",
+    parser.add_argument('--pretrained', dest='pretrained', default="",
                         help='path to pre-trained model')
     parser.add_argument('--no-date', action='store_false',
                         help='don\'t append date timestamp to folder')

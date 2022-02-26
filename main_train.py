@@ -84,11 +84,11 @@ def main():
 
     # model = models.__dict__[args.arch](network_data).to(args.device)
 
-    args.small = True
+    args.small = False
     args.mixed_precision = False
     model_raft = torch.nn.DataParallel(RAFT(args))
     model_raft.load_state_dict(torch.load(
-        os.path.join("FlowNetPytorch", "models", "raft-small.pth"), map_location=args.device))
+        os.path.join("FlowNetPytorch", "models", "raft-sintel.pth"), map_location=args.device))
 
     model_raft = model_raft.module
     model_raft.to(args.device)
@@ -184,7 +184,8 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
 
     criterion = SmoothL1Loss()
     end = time.time()
-    loss_weights = [0.20, 0.35, 0.45]
+    loss_weights = [0.04, 0.08, 0.1, 0.13, 0.15, 0.2, 0.3]
+    flow_scales = [0.5, 0.5, 0.5, 0.5, 1.0, 1.0]
     with tqdm(total=len(train_loader)*args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
 
         tot_loss = 0
@@ -197,57 +198,36 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
 
             # compute output
             frame1, frame2 = model_flownet(input)
-            flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+            flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
             flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
             flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
+            flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
+            flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
+            flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
 
-            sm_tgt = tr_f.resize(target, flow[0].shape[-1])
-            sm_tgt2 = tr_f.resize(target, flow2[0].shape[-1])
-            target2 = tr_f.resize(target, flow2[1].shape[-1])
-            sm_tgt3 = tr_f.resize(target, flow3[0].shape[-1])
-            target3 = tr_f.resize(target, flow3[1].shape[-1])
+            # sm_tgt = tr_f.resize(target, flow1[0].shape[-1])
+            # sm_tgt2 = tr_f.resize(target, flow2[0].shape[-1])
+            # sm_tgt3 = tr_f.resize(target, flow3[0].shape[-1])
+            target_128 = tr_f.resize(target, flow3[1].shape[-1])
 
-            loss1_1 = loss_weights[0] * args.div_flow * criterion(flow[0], sm_tgt)
-            loss2_1 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
+            # loss1_1 = loss_weights[0] * args.div_flow * criterion(flow[0], sm_tgt)
+            loss1_1 = loss_weights[0] * args.div_flow * criterion(flow1[1], flow_scales[0]*target)
 
-            loss1_2 = loss_weights[1] * args.div_flow * criterion(flow2[0], sm_tgt2)
-            loss2_2 = loss_weights[1] * args.div_flow * criterion(flow2[1], target2)
+            # loss1_2 = loss_weights[1] * args.div_flow * criterion(flow2[0], sm_tgt2)
+            loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1]*target)
 
-            loss1_3 = loss_weights[2] * args.div_flow * criterion(flow3[0], sm_tgt3)
-            loss2_3 = loss_weights[2] * args.div_flow * criterion(flow3[1], target3)
+            # loss1_3 = loss_weights[2] * args.div_flow * criterion(flow3[0], sm_tgt3)
+            loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
+            loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
+            loss5_1 = loss_weights[4] * args.div_flow * criterion(flow5[1], flow_scales[4] * target_128)
+            loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
 
-            loss = loss1_1 + loss2_1 + loss1_2 + loss2_2 + loss1_3 + loss2_3
+            loss = loss1_1 + loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
             tot_loss += loss.item()
-            # print(f"Actual Loss:{loss}")
-            # for ind in range(len(frame1)):
-            #     sz = frame1[ind].shape[-1]//8
-            #     if sz > 4:
-            #         print(f"index:{ind}")
-            #         tgt = tr_f.center_crop(target, sz * 8)
-            #         flow = flow_model(frame1[ind], frame2[ind], iters=8, test_mode=True)
-            #
-            #         loss = loss_weights[ind]*args.div_flow*criterion(flow[1], tgt)
-            #
-            #         loss.backward(retain_graph=True)
-            #
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            # loss = multiscaleEPE(output, target, weights=args.multiscale_weights, sparse=args.sparse)
-
-            # flow2_EPE = args.div_flow * realEPE(output[0], target, sparse=args.sparse)
-            # record loss and EPE
-            # losses.update(loss.item(), target.size(0))
-            # train_writer.add_scalar('train_loss', loss.item(), n_iter)
-            # flow2_EPEs.update(flow2_EPE.item(), target.size(0))
-
-            # compute gradient and do optimization step
-
-            # measure elapsed time
-            # batch_time.update(time.time() - end)
-            # end = time.time()
 
             pbar.update(input.shape[0])
             experiment.log({
@@ -256,21 +236,12 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
                 'epoch': epoch
             })
             pbar.set_postfix(**{'loss (batch)': tot_loss/(i+1)})
-            # if i % args.print_freq == 0:
-            #     print('Epoch: [{0}][{1}/{2}]\t Time {3}\t Data {4}\t Loss {5}\t EPE {6}'
-            #           .format(epoch, i, epoch_size, batch_time,
-            #                   data_time, losses, flow2_EPEs))
-            # if i >= epoch_size:
-            #     break
+
             n_iter += 1
-    # return losses.avg, flow2_EPEs.avg, experiment
     return experiment
 
 
 def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers, experiment):
-
-    # batch_time = AverageMeter()
-    # flow2_EPEs = AverageMeter()
 
     # switch to evaluate mode
     model_flownet.eval()
@@ -290,10 +261,10 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         # compute output
         frame1, frame2 = model_flownet(input)
         flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
-        sm_tgt = tr_f.resize(target, flow[0].shape[-1])
-        loss1 = loss_weights[-1] * args.div_flow * criterion(flow[0], sm_tgt)
-        loss2 = loss_weights[0] * args.div_flow * criterion(flow[1], target)
-        loss = loss1 + loss2
+        # sm_tgt = tr_f.resize(target, flow[0].shape[-1])
+        # loss1 = args.div_flow * criterion(flow[0], sm_tgt)
+        loss2 = args.div_flow * criterion(flow[1], target)
+        loss = loss2 #+ loss1
         tot_loss += loss.item()
         # print(f"flow[1] shape:{flow[1].shape}")
         # flow2_EPE += args.div_flow*realEPE(output, target, sparse=args.sparse)
@@ -324,21 +295,6 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         'step': n_iter,
         'epoch': epoch,
     })
-            # if epoch == args.start_epoch:
-            #     # mean_values = torch.tensor([0.45,0.432,0.411], dtype=input.dtype).view(3,1,1)
-            #     mean_values = torch.tensor([0., 0., 0.], dtype=input.dtype).view(3, 1, 1)
-            #     output_writers[i].add_image('GroundTruth', flow2rgb(args.div_flow * target[0], max_value=max_val), 0)
-            #     output_writers[i].add_image('Inputs', (input[0,:3].cpu() + mean_values).clamp(0,1), 0)
-            #     # output_writers[i].add_image('Inputs', (input[0,3:].cpu() + mean_values).clamp(0,1), 1)
-            # output_writers[i].add_image('FlowNet Outputs', flow2rgb(args.div_flow * output[0], max_value=max_val), epoch)
-
-        # if i % args.print_freq == 0:
-        #     print('Test: [{0}/{1}]\t Time {2}\t EPE {3}'
-        #           .format(i, len(val_loader), batch_time, flow2_EPEs))
-
-    # print(' * EPE {:.3f}'.format(flow2_EPEs.avg))
-
-    # return flow2_EPEs.avg, experiment
     return experiment, avg_epe
 
 
