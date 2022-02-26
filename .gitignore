@@ -136,3 +136,5 @@ Pytorch-UNet/
 *.pfm
 FlowNetPytorch/LICENSE
 *.gif
+flying_chairs/
+wandb/
