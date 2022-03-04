@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+import torchvision.transforms.functional as tr_f
 
 # try:
 #     from spatial_correlation_sampler import spatial_correlation_sample
@@ -110,7 +111,10 @@ def warp(x, flo):
 
     vgrid = vgrid.permute(0, 2, 3, 1)
     output = nn.functional.grid_sample(x, vgrid)
-    mask = torch.autograd.Variable(torch.ones(x.size())).cuda()
+    if x.is_cuda:
+        mask = torch.autograd.Variable(torch.ones(x.size())).cuda()
+    else:
+        mask = torch.autograd.Variable(torch.ones(x.size()))
     mask = nn.functional.grid_sample(mask, vgrid)
 
     # if W==128:
@@ -122,10 +126,17 @@ def warp(x, flo):
 
     return output * mask
 
-# def warp_loss(f1, f2, flo, criterion):
-#     # Calculating loss after warping f2 -> f1 with the given flow
-#     f2_warped = warp(f2, flo)
-#     return criterion(f1, f2_warped)
+
+def warp_loss(frames1, frames2, flows, criterion):
+    # Calculating loss after warping f2 -> f1 with the given flow
+    total_loss = 0
+    for ind in range(len(frames1)):
+        scaled_flow = tr_f.resize(flows[ind][1], frames1[ind].shape[-1]) * (frames1[ind].shape[-1] / flows[ind][1].shape[-1])
+        f1_warped = warp(frames1[ind], scaled_flow)
+        loss = criterion(frames2[ind], f1_warped)
+        total_loss += loss
+    return total_loss
+
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""

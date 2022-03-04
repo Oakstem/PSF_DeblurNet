@@ -19,6 +19,7 @@ from FlowNetPytorch.models.Framing import GoWithTheFlownet
 from FlowNetPytorch.models.raft import RAFT
 import datetime
 from FlowNetPytorch.util import flow2rgb, save_checkpoint
+from FlowNetPytorch.models.util import warp_loss
 from torch.nn import SmoothL1Loss
 
 
@@ -84,11 +85,15 @@ def main():
 
     # model = models.__dict__[args.arch](network_data).to(args.device)
 
-    args.small = False
+    args.small = True
     args.mixed_precision = False
     model_raft = torch.nn.DataParallel(RAFT(args))
+    if args.small:
+        raft_path = "raft-small.pth"
+    else:
+        raft_path = "raft-sintel.pth"
     model_raft.load_state_dict(torch.load(
-        os.path.join("FlowNetPytorch", "models", "raft-sintel.pth"), map_location=args.device))
+        os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
 
     model_raft = model_raft.module
     model_raft.to(args.device)
@@ -132,6 +137,8 @@ def main():
             ''')
     args.div_flow = 20
     args.nb_raft_iter = 8
+    args.unsupervised = True
+    # args.evaluate = True
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
 
@@ -159,7 +166,6 @@ def main():
             # 'best_EPE': best_EPE,
             'div_flow': args.div_flow
         }, is_best=is_best, save_path=save_path)
-
 
 
 def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment):
@@ -197,7 +203,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             input = input.to(args.device)
 
             # compute output
-            frame1, frame2 = model_flownet(input)
+            frame1, frame2, feat1, feat2 = model_flownet(input)
             flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
             flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
             flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
@@ -205,24 +211,22 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
             flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
 
-            # sm_tgt = tr_f.resize(target, flow1[0].shape[-1])
-            # sm_tgt2 = tr_f.resize(target, flow2[0].shape[-1])
-            # sm_tgt3 = tr_f.resize(target, flow3[0].shape[-1])
-            target_128 = tr_f.resize(target, flow3[1].shape[-1])
+            flows = (flow1, flow2, flow3, flow4, flow5, flow6)
 
-            # loss1_1 = loss_weights[0] * args.div_flow * criterion(flow[0], sm_tgt)
-            loss1_1 = loss_weights[0] * args.div_flow * criterion(flow1[1], flow_scales[0]*target)
+            if not args.unsupervised:
+                target_128 = tr_f.resize(target, flow3[1].shape[-1])
 
-            # loss1_2 = loss_weights[1] * args.div_flow * criterion(flow2[0], sm_tgt2)
-            loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1]*target)
+                loss1_1 = loss_weights[0] * args.div_flow * criterion(flow1[1], flow_scales[0] * target)
+                loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
+                loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
+                loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
+                loss5_1 = loss_weights[4] * args.div_flow * criterion(flow5[1], flow_scales[4] * target_128)
+                loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
 
-            # loss1_3 = loss_weights[2] * args.div_flow * criterion(flow3[0], sm_tgt3)
-            loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
-            loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
-            loss5_1 = loss_weights[4] * args.div_flow * criterion(flow5[1], flow_scales[4] * target_128)
-            loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
+                loss = loss1_1 + loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
+            else:
+                loss = warp_loss(feat1, feat2, flows, criterion)
 
-            loss = loss1_1 + loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
             tot_loss += loss.item()
 
             optimizer.zero_grad()
@@ -259,28 +263,22 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         input = input.to(args.device)
 
         # compute output
-        frame1, frame2 = model_flownet(input)
-        flow = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
-        # sm_tgt = tr_f.resize(target, flow[0].shape[-1])
-        # loss1 = args.div_flow * criterion(flow[0], sm_tgt)
-        loss2 = args.div_flow * criterion(flow[1], target)
-        loss = loss2 #+ loss1
+        frame1, frame2, feat1, feat2 = model_flownet(input)
+        flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+        flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
+        flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
+        flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
+        flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
+        flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
+
+        flows = (flow1, flow2, flow3, flow4, flow5, flow6)
+
+        if not args.unsupervised:
+            loss = args.div_flow * criterion(flow1[1], target)
+        else:
+            loss = warp_loss(feat1, feat2, flows, criterion)
         tot_loss += loss.item()
-        # print(f"flow[1] shape:{flow[1].shape}")
-        # flow2_EPE += args.div_flow*realEPE(output, target, sparse=args.sparse)
-        # flow2_EPE += args.div_flow*criterion(flow[1], target)
-        # record EPE
-        # flow2_EPEs.update(flow2_EPE.item(), target.size(0))
 
-        # measure elapsed time
-        # batch_time.update(time.time() - end)
-        # end = time.time()
-
-        # if i < len(output_writers):  # log first output of first batches
-        # if args.evaluate:
-        #     generate_img(target, flow, max_val, args.div_flow)
-
-        # if i < 1:
     max_val = 10
     avg_epe = (tot_loss/len(val_loader))
     logging.info('Validation epe score: {}'.format(avg_epe))
@@ -290,7 +288,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         'images': wandb.Image(input[0].cpu()),
         'flows': {
             'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
-            'pred': wandb.Image(flow2rgb(args.div_flow * flow[1][0], max_value=max_val).transpose((1,2,0))),
+            'pred': wandb.Image(flow2rgb(args.div_flow * flow1[1][0], max_value=max_val).transpose((1,2,0))),
         },
         'step': n_iter,
         'epoch': epoch,

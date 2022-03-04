@@ -14,10 +14,10 @@ class GoWithTheFlownet(nn.Module):
         self.decoder_r = Decoder(device)
 
     def forward(self, x):
-        left_frames = self.decoder_l(x)
-        right_frames = self.decoder_r(x)
+        left_frames, left_features = self.decoder_l(x)
+        right_frames, right_features = self.decoder_r(x)
 
-        return left_frames, right_frames
+        return left_frames, right_frames, left_features, right_features
 
 
 class Encoder(nn.Module):
@@ -162,7 +162,9 @@ class Decoder(nn.Module):
         # dec_up5 = self.dec6_up(dec5)
 
         # return dec1, dec2, dec3, dec4, dec5, dec6
-        return dec_rgb1, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6 #, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6
+        flows = (dec_rgb1, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6)
+        features = (dec1, dec2, dec3, dec4, dec5, dec6)
+        return flows, features
 
 class STN(nn.Module):
     def __init__(self):
