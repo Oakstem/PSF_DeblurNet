@@ -62,7 +62,7 @@ class FlyingChairs2(Dataset):
              #transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
 
         image_optical_path = self.files_optical[index]
-        image_optical: ndarray = read_flo(self.files_optical[index])[0][..., :2]
+        image_optical: ndarray = read_flo(self.files_optical[index])[..., :2]
         image_optical_tensor: Tensor = transform(image_optical.copy())
 
         return image_blurred_tensor, image_optical_tensor, index

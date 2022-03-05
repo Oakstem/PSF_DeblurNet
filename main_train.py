@@ -265,14 +265,14 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         # compute output
         frame1, frame2, feat1, feat2 = model_flownet(input)
         flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
-        flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
-        flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
-        flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
-        flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
-        flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
+        # flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
+        # flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
+        # flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
+        # flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
+        # flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
 
-        flows = (flow1, flow2, flow3, flow4, flow5, flow6)
-
+        # flows = (flow1, flow2, flow3, flow4, flow5, flow6)
+        flows = flow1
         if not args.unsupervised:
             loss = args.div_flow * criterion(flow1[1], target)
         else:
@@ -282,7 +282,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
     max_val = 10
     avg_epe = (tot_loss/len(val_loader))
     logging.info('Validation epe score: {}'.format(avg_epe))
-    print(f"target shape:{target.shape}, flow1 shape:{flow1[1][0].shape}")
+    # print(f"target shape:{target.shape}, flow1 shape:{flow1[1][0].shape}")
     experiment.log({
         'learning rate': args.lr,
         'validation loss': avg_epe,
