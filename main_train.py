@@ -31,9 +31,12 @@ def main():
     global best_EPE, n_iter
     try:
         import colab
-        data_path = "/content/drive/MyDrive/test_chairs"
+        # data_path = "/content/drive/MyDrive/test_chairs"
+        data_path = "/content/drive/MyDrive/Colab Notebooks"
+        data_type = "chairs"
     except:
         data_path = "G:/My Drive/Colab Notebooks/test_chairs"
+        data_type = "monkaa"
         # data_path = "/home/jupyter/"
 
     args: argparse.Namespace = parse_arguments()
@@ -67,8 +70,8 @@ def main():
 
     print("=> fetching img pairs in '{}'".format(data_path))
 
-    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit)
-    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit)
+    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit, data_type=data_type)
+    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit, data_type=data_type)
     args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model_flownet = GoWithTheFlownet(args.device)
     model_flownet.to(args.device)
@@ -137,16 +140,12 @@ def main():
             ''')
     args.div_flow = 20
     args.nb_raft_iter = 8
-    args.unsupervised = True
+    args.unsupervised = False
     # args.evaluate = True
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
-
-            # train_loss, train_EPE, experiment = train(train_loader, model, optimizer, epoch, train_writer, experiment)
         if not args.evaluate:
             experiment = train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment)
-        # train_writer.add_scalar('mean EPE', train_EPE, epoch)
-
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
@@ -191,7 +190,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
     criterion = SmoothL1Loss()
     end = time.time()
     loss_weights = [0.04, 0.08, 0.1, 0.13, 0.15, 0.2, 0.3]
-    flow_scales = [0.5, 0.5, 0.5, 0.5, 1.0, 1.0]
+    flow_scales = [1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
     with tqdm(total=len(train_loader)*args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
 
         tot_loss = 0
@@ -282,6 +281,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
     max_val = 10
     avg_epe = (tot_loss/len(val_loader))
     logging.info('Validation epe score: {}'.format(avg_epe))
+    print(f"target shape:{target.shape}, flow1 shape:{flow1[1][0].shape}")
     experiment.log({
         'learning rate': args.lr,
         'validation loss': avg_epe,

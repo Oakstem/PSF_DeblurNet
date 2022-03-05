@@ -50,7 +50,7 @@ class Decoder(nn.Module):
 
         # enc_features = [64, 128, 256, 512, 768, 1024]
         # smaller version:
-        enc_features = [50, 100, 200, 200, 300, 400]
+        enc_features = [5, 10, 30, 50, 70, 90]
         # dec_features = [50, 50, 50, 660, 960, 860]
         # current feature offset with densenet growth rate = 12:
         feature_offs = 60
@@ -165,6 +165,7 @@ class Decoder(nn.Module):
         flows = (dec_rgb1, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6)
         features = (dec1, dec2, dec3, dec4, dec5, dec6)
         return flows, features
+
 
 class STN(nn.Module):
     def __init__(self):

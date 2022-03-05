@@ -78,6 +78,7 @@ def parse_arguments():
     parser.add_argument('--milestones', default=[30, 60, 80], metavar='N', nargs='*',
                         help='epochs at which learning rate is divided by 2')
 
+
     args: argparse.Namespace = parser.parse_args()
     return args
 

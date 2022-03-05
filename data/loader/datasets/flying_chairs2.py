@@ -2,6 +2,7 @@ import copy
 import os
 import os.path
 import cv2
+import random
 from numpy import ndarray
 from torch import Tensor
 from torch.utils.data import Dataset
@@ -13,7 +14,7 @@ from data.files_reader.flo import read_flo
 
 class FlyingChairs2(Dataset):
 
-    def __init__(self, dataset_path: str, subtypes: [SubType], train: bool):
+    def __init__(self, dataset_path: str, subtypes: [SubType], train: bool, limit_percent: float):
 
         slash = "\\" if os.name == "nt" else "/"
         files_paths = os.path.join(dataset_path, "train" if train else "val") + slash
@@ -26,7 +27,7 @@ class FlyingChairs2(Dataset):
         files_optical: [] = None
         #files_left = self.get_files(files_paths, "-img_0.png")
         #files_right = self.get_files(files_paths, "-img_1.png")
-        files_blurred = self.get_files(files_paths, "-img_blurred.png")
+        files_blurred = self.get_files(files_paths, "-img_blurred.png", limit=limit_percent)
         files_flo = copy.deepcopy(files_blurred)
         for idx, _ in enumerate(files_flo):
             files_flo[idx] = files_flo[idx].replace("-img_blurred.png", "-flow_01.flo")
@@ -71,11 +72,14 @@ class FlyingChairs2(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return image
 
-    def get_files(self, dir, files_extention: str):
+    def get_files(self, dir, files_extention: str, limit: float):
         files = []
         for f in os.scandir(dir):
             if f.is_file():
                 if files_extention in f.name:
                     files.append(f.path)
+        random.shuffle(files)
+        nb_files = len(files)
+        files = files[:int(nb_files*limit)]
 
         return files

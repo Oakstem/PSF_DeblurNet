@@ -8,9 +8,12 @@ from data.sub_type import SubType
 from data.type import Type
 
 
-def load_data(path: str, batch_size: int, train: bool, shuffle: bool, limit: float):
+def load_data(path: str, batch_size: int, train: bool, shuffle: bool, limit: float, data_type: str):
     root_path = path
-    type: Type = Type.MONKAA
+    if data_type == "monkaa":
+        type: Type = Type.MONKAA
+    else:
+        type: Type = Type.FLYING_CHAIRS2
     sub_type_left: SubType = SubType.FUTURE_LEFT
     sub_type_right: SubType = SubType.FUTURE_RIGHT
     data_loader_params: DataLoaderParams = \
