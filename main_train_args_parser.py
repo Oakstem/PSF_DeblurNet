@@ -9,11 +9,11 @@ def parse_arguments():
                          if name.islower() and not name.startswith("__"))
     dataset_names = sorted(name for name in data.__all__)
     parser: argparse.ArgumentParser = \
-        argparse.ArgumentParser(description='PyTorch FlowNet Training on several datasets',
+        argparse.ArgumentParser(description='PyTorch GoWithTheFlowNet Training on several datasets',
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # parser.add_argument('data', metavar='DIR',default="../..",
     #                     help='path to dataset')
-    parser.add_argument('--dataset', metavar='DATASET', default='flying_chairs',
+    parser.add_argument('--dataset', metavar='DATASET', default='monkaa',
                         choices=dataset_names,
                         help='dataset type : ' +
                              ' | '.join(dataset_names))

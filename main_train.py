@@ -29,17 +29,18 @@ n_iter = int(0)
 
 def main():
     global best_EPE, n_iter
+    args: argparse.Namespace = parse_arguments()
+
     try:
         import colab
         # data_path = "/content/drive/MyDrive/test_chairs"
-        data_path = "/content/drive/MyDrive/Colab Notebooks"
-        data_type = "chairs"
+
+        if args.dataset == 'monkaa':
+            data_path = "/content/drive/MyDrive/test_chairs"
+        else:
+            data_path = "/content/drive/MyDrive/Colab Notebooks"
     except:
         data_path = "G:/My Drive/Colab Notebooks/test_chairs"
-        data_type = "monkaa"
-        # data_path = "/home/jupyter/"
-
-    args: argparse.Namespace = parse_arguments()
 
     save_path = '{},{},{}epochs{},b{},lr{}'.format(
         args.arch, args.solver, args.epochs,
@@ -57,7 +58,7 @@ def main():
         np.random.seed(args.split_seed)
 
     # (Initialize logging)
-    experiment = wandb.init(project='FlowNet', resume='allow', anonymous='must')        #, entity="oakstem")
+    experiment = wandb.init(project='GoWithTheFlowNet', resume='allow', anonymous='must')
 
     experiment.config.update(dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr,
                                   val_percent=0.1, save_checkpoint=True, img_scale=1,
@@ -70,8 +71,8 @@ def main():
 
     print("=> fetching img pairs in '{}'".format(data_path))
 
-    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit, data_type=data_type)
-    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit, data_type=data_type)
+    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit, data_type=args.dataset)
+    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit, data_type=args.dataset)
     args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model_flownet = GoWithTheFlownet(args.device)
     model_flownet.to(args.device)
