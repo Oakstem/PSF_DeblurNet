@@ -58,8 +58,8 @@ class FlyingChairs2(Dataset):
         transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Resize((image_blurred_height, image_blurred_width)),
-             transforms.CenterCrop(self.img_size)])
-             #transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
+             # transforms.CenterCrop(self.img_size)])
+             transforms.Normalize(mean=[0, 0], std=[self.div_flow, self.div_flow])])
 
         image_optical_path = self.files_optical[index]
         image_optical: ndarray = read_flo(self.files_optical[index])[..., :2]
