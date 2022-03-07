@@ -190,7 +190,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
 
     criterion = SmoothL1Loss()
     end = time.time()
-    loss_weights = [0.04, 0.08, 0.1, 0.13, 0.15, 0.2, 0.3]
+    loss_weights = [1, 0.08, 0.1, 0.13, 0.15, 0.2, 0.3]
     flow_scales = [1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
     with tqdm(total=len(train_loader)*args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
 
@@ -204,6 +204,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
 
             # compute output
             frame1, frame2, feat1, feat2 = model_flownet(input)
+            # print(f"input shape:{input[0].shape}, target shape:{target.shape}")
             flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
             flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
             flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
@@ -214,16 +215,16 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             flows = (flow1, flow2, flow3, flow4, flow5, flow6)
 
             if not args.unsupervised:
-                target_128 = tr_f.resize(target, flow3[1].shape[-1])
+                # target_128 = tr_f.resize(target, flow3[1].shape[-1])
 
                 loss1_1 = loss_weights[0] * args.div_flow * criterion(flow1[1], flow_scales[0] * target)
-                loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
-                loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
-                loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
-                loss5_1 = loss_weights[4] * args.div_flow * criterion(flow5[1], flow_scales[4] * target_128)
-                loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
+                # loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
+                # loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
+                # loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
+                # loss5_1 = loss_weights[4] * args.div_flow * criterion(flow5[1], flow_scales[4] * target_128)
+                # loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
 
-                loss = loss1_1 + loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
+                loss = loss1_1 #+ loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
             else:
                 loss = warp_loss(feat1, feat2, flows, criterion)
 
