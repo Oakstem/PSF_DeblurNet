@@ -48,9 +48,9 @@ class Decoder(nn.Module):
     def __init__(self, device, input_channels = 3, levels = 6, batchNorm=True):
         super(Decoder,self).__init__()
 
-        # enc_features = [64, 128, 256, 512, 768, 1024]
+        enc_features = [64, 128, 256, 512, 768, 1024]
         # smaller version:
-        enc_features = [5, 10, 30, 50, 70, 90]
+        # enc_features = [5, 10, 30, 50, 70, 90]
         # dec_features = [50, 50, 50, 660, 960, 860]
         # current feature offset with densenet growth rate = 12:
         feature_offs = 60
