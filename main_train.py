@@ -129,7 +129,7 @@ def main():
     #     best_EPE = validate(val_loader, model, raft_model, 0, output_writers, experiment)
     #     return
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=0.5, verbose=True)
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logging.info(f'''Starting training:
@@ -154,7 +154,7 @@ def main():
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(args, train_loader, model_flownet, pwcnet, epoch, output_writers, experiment)
+            experiment, EPE = validate(args, val_loader, model_flownet, pwcnet, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -205,12 +205,12 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             target = target.to(args.device)
             # input = torch.cat(input,1).to(args.device)
             input = input.to(args.device)
-
+            input = tr_f.resize(input, 512)
             # compute output
             frame1, frame2, feat1, feat2 = model_flownet(input)
             # print(f"input shape:{input[0].shape}, target shape:{target.shape}")
-            cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
-            flow1 = model_raft(cat_frames)
+            # cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
+            flow1 = model_raft(feat1, feat2)
             # flow2 = model_raft(frame1[1], frame2[1])
             # flow3 = model_raft(frame1[2], frame2[2])
             # flow4 = model_raft(frame1[3], frame2[3])
@@ -267,11 +267,11 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         target = target.to(args.device)
         # input = torch.cat(input,1).to(args.device)
         input = input.to(args.device)
-
+        input = tr_f.resize(input, 512)
         # compute output
         frame1, frame2, feat1, feat2 = model_flownet(input)
-        cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
-        flow1 = model_raft(cat_frames)
+        # cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
+        flow1 = model_raft(feat1, feat2)
         # flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
         # flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
         # flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)

@@ -55,8 +55,14 @@ class SpatialTransformer(nn.Module):
         x = F.relu(self.conv3(x))
         x = F.max_pool2d(x, 2)
         x = F.relu(self.conv3(x))
-        if x.shape[-1] > 1:
+        if x.shape[-1] > 2:
+            x = F.max_pool2d(x, 4)
+        else:
             x = F.max_pool2d(x, 2)
+        # Uncomment & replace maxpool for img size 256
+        # if x.shape[-1] > 1:
+        #     x = F.max_pool2d(x, 2)
+
         # print("Pre view size:{}".format(x.size()))
         # div = np.prod(x.shape) // batch_images.shape[0]
         # x = x.view(-1, 32 * 4 * 4)

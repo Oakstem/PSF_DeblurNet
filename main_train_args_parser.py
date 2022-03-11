@@ -39,7 +39,7 @@ def parse_arguments():
                         help='path to dataset')
     parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
                         help='number of data loading workers')
-    parser.add_argument('--limit', default=0.9, type=float,
+    parser.add_argument('--limit', default=0.01, type=float,
                         help='limit the dataset size')
     parser.add_argument('--epochs', default=150, type=int, metavar='N',
                         help='number of total epochs to run')
@@ -69,7 +69,7 @@ def parse_arguments():
                         metavar='N', help='print frequency')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', dest='pretrained', default="model_best.pth.tar",
+    parser.add_argument('--pretrained', dest='pretrained', default="",
                         help='path to pre-trained model')
     parser.add_argument('--no-date', action='store_false',
                         help='don\'t append date timestamp to folder')

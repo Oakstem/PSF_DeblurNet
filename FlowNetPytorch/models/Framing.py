@@ -48,29 +48,35 @@ class Decoder(nn.Module):
     def __init__(self, device, input_channels = 3, levels = 6, batchNorm=True):
         super(Decoder,self).__init__()
 
-        enc_features = [64, 128, 256, 512, 768, 1024]
+        # enc_features = [8, 16, 32, 64, 128, 512]
         # smaller version:
-        # enc_features = [5, 10, 30, 50, 70, 90]
+        enc_features = [4, 9, 18, 27, 36, 88]
         # dec_features = [50, 50, 50, 660, 960, 860]
         # current feature offset with densenet growth rate = 12:
-        feature_offs = 60
+        feature_offs_5 = 20
+        feature_offs_4 = 15
+        feature_offs_3 = 10
+        feature_offs_2 = 5
+        feature_offs_1 = 4
 
         self.encoder = Encoder(input_channels=input_channels, batchNorm=batchNorm, enc_features=enc_features).to(device)
 
         self.decoders = []
-        for i in range(len(enc_features)):
-            if i < 5:
-                self.decoders.append(DenseBlock(num_input_features=3 * enc_features[i]).to(device))
-            else:
-                self.decoders.append(DenseBlock(num_input_features=2 * enc_features[i]).to(device))
+
+        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[0], num_layers=4,  growth_rate=1).to(device))
+        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[1], growth_rate=1).to(device))
+        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[2], growth_rate=2).to(device))
+        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[3], growth_rate=3).to(device))
+        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[4], growth_rate=4).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[5], growth_rate=4).to(device))
 
 
-        self.dec6_up = deconv(2*enc_features[5]+feature_offs, enc_features[4])
-        self.dec5_up = deconv(3*enc_features[4]+feature_offs, enc_features[3])
-        self.dec4_up = deconv(3*enc_features[3]+feature_offs, enc_features[2])
-        self.dec3_up = deconv(3*enc_features[2]+feature_offs, enc_features[1])
-        self.dec2_up = deconv(3*enc_features[1]+feature_offs, enc_features[0])
-        self.dec1_up = deconv(3*enc_features[0]+feature_offs, input_channels)
+        self.dec6_up = deconv(2*enc_features[5]+feature_offs_5, enc_features[4])
+        self.dec5_up = deconv(3*enc_features[4]+feature_offs_5, enc_features[3])
+        self.dec4_up = deconv(3*enc_features[3]+feature_offs_4, enc_features[2])
+        self.dec3_up = deconv(3*enc_features[2]+feature_offs_3, enc_features[1])
+        self.dec2_up = deconv(3*enc_features[1]+feature_offs_2, enc_features[0])
+        self.dec1_up = deconv(3*enc_features[0]+feature_offs_1, input_channels)
 
         self.dec6_torgb = conv_block(batchNorm, enc_features[4], 3)
         self.dec5_torgb = conv(batchNorm, enc_features[3], 3)
@@ -80,12 +86,12 @@ class Decoder(nn.Module):
 
         self.dec3_torgb_up = deconv(enc_features[1], 3)
 
-        self.flow6_up = Up(in_channels=2 * enc_features[5] + feature_offs, out_channels=3, ups_factor=25, target_sz=128)
-        self.flow5_up = Up(in_channels=3 * enc_features[4] + feature_offs, out_channels=3, ups_factor=14, target_sz=128)
-        self.flow4_up = Up(in_channels=3 * enc_features[3] + feature_offs, out_channels=3, ups_factor=7, target_sz=128)
-        self.flow3_up = Up(in_channels=3 * enc_features[2] + feature_offs, out_channels=3, ups_factor=3, target_sz=128)
-        self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs, out_channels=3, ups_factor=4, target_sz=256)
-        self.flow1_up = Up(in_channels=3 * enc_features[0] + feature_offs, out_channels=3, ups_factor=2, target_sz=256)
+        self.flow6_up = Up(in_channels=2 * enc_features[5] + feature_offs_5, out_channels=3, ups_factor=25, target_sz=128)
+        self.flow5_up = Up(in_channels=3 * enc_features[4] + feature_offs_5, out_channels=3, ups_factor=14, target_sz=128)
+        self.flow4_up = Up(in_channels=3 * enc_features[3] + feature_offs_4, out_channels=3, ups_factor=7, target_sz=128)
+        self.flow3_up = Up(in_channels=3 * enc_features[2] + feature_offs_3, out_channels=3, ups_factor=3, target_sz=128)
+        self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs_2, out_channels=3, ups_factor=4, target_sz=256)
+        self.flow1_up = Up(in_channels=3 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2, target_sz=256)
 
         self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
@@ -281,7 +287,7 @@ class DenseLayer(nn.Module):
 class DenseBlock(nn.ModuleDict):
     _version = 2
     # The paper states good values for growth rate: 12, 24, 32, 40
-    def __init__(self, num_input_features, num_layers=5, bn_size=4, growth_rate=12, drop_rate=0, memory_efficient=False):
+    def __init__(self, num_input_features, num_layers=5, bn_size=4, growth_rate=4, drop_rate=0, memory_efficient=False):
         super(DenseBlock, self).__init__()
         for i in range(num_layers):
             layer = DenseLayer(
