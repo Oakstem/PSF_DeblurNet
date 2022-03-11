@@ -20,7 +20,7 @@ class FlyingChairs2(Dataset):
         files_paths = os.path.join(dataset_path, "train" if train else "val") + slash
 
         self.subtype: SubType = subtypes
-        self.img_size = 264
+        self.img_size = 256
         self.div_flow = 20
         # In case you want to limit training to a smaller dataset
         files_blurred: [] = None

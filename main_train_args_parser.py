@@ -13,7 +13,7 @@ def parse_arguments():
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # parser.add_argument('data', metavar='DIR',default="../..",
     #                     help='path to dataset')
-    parser.add_argument('--dataset', metavar='DATASET', default='monkaa',
+    parser.add_argument('--dataset', metavar='DATASET', default='chairs',
                         choices=dataset_names,
                         help='dataset type : ' +
                              ' | '.join(dataset_names))
@@ -47,7 +47,7 @@ def parse_arguments():
                         help='manual epoch number (useful on restarts)')
     parser.add_argument('--epoch-size', default=1000, type=int, metavar='N',
                         help='manual epoch size (will match dataset size if set to 0)')
-    parser.add_argument('-b', '--batch_size', default=4, type=int,
+    parser.add_argument('-b', '--batch_size', default=1, type=int,
                         metavar='N', help='mini-batch size')
     parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float,
                         metavar='LR', help='initial learning rate')
@@ -69,7 +69,7 @@ def parse_arguments():
                         metavar='N', help='print frequency')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', dest='pretrained', default="",
+    parser.add_argument('--pretrained', dest='pretrained', default="model_best.pth.tar",
                         help='path to pre-trained model')
     parser.add_argument('--no-date', action='store_false',
                         help='don\'t append date timestamp to folder')

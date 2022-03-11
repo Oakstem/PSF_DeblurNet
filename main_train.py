@@ -21,7 +21,7 @@ import datetime
 from FlowNetPytorch.util import flow2rgb, save_checkpoint
 from FlowNetPytorch.models.util import warp_loss
 from torch.nn import SmoothL1Loss
-
+from PWC_Net.PyTorch import models
 
 best_EPE = -1
 n_iter = int(0)
@@ -30,17 +30,17 @@ n_iter = int(0)
 def main():
     global best_EPE, n_iter
     args: argparse.Namespace = parse_arguments()
+    # args.evaluate = True
 
     try:
         import colab
         # data_path = "/content/drive/MyDrive/test_chairs"
-
         if args.dataset == 'monkaa':
             data_path = "/content/drive/MyDrive/test_chairs"
         else:
             data_path = "/content/drive/MyDrive/Colab Notebooks"
     except:
-        data_path = "G:/My Drive/Colab Notebooks/test_chairs"
+        data_path = "/home/gentex/studies"
 
     save_path = '{},{},{}epochs{},b{},lr{}'.format(
         args.arch, args.solver, args.epochs,
@@ -89,19 +89,23 @@ def main():
 
     # model = models.__dict__[args.arch](network_data).to(args.device)
 
-    args.small = True
-    args.mixed_precision = False
-    model_raft = torch.nn.DataParallel(RAFT(args))
-    if args.small:
-        raft_path = "raft-small.pth"
-    else:
-        raft_path = "raft-sintel.pth"
-    model_raft.load_state_dict(torch.load(
-        os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
-
-    model_raft = model_raft.module
-    model_raft.to(args.device)
-    model_raft.eval()
+    # args.small = True
+    # args.mixed_precision = False
+    # model_raft = torch.nn.DataParallel(RAFT(args))
+    # if args.small:
+    #     raft_path = "raft-small.pth"
+    # else:
+    #     raft_path = "raft-sintel.pth"
+    # model_raft.load_state_dict(torch.load(
+    #     os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
+    #
+    # model_raft = model_raft.module
+    # model_raft.to(args.device)
+    # model_raft.eval()
+    pwc_model_fn = '/home/gentex/studies/PSF_DeblurNet/PWC_Net/PyTorch/pwc_net.pth.tar'
+    pwcnet = models.pwc_dc_net(pwc_model_fn)
+    pwcnet = pwcnet.cuda()
+    pwcnet.eval()
 
     assert(args.solver in ['adam', 'sgd'])
     print('=> setting {} solver'.format(args.solver))
@@ -146,11 +150,11 @@ def main():
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
         if not args.evaluate:
-            experiment = train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment)
+            experiment = train(args, train_loader, model_flownet, pwcnet, optimizer, epoch, train_writer, experiment)
             scheduler.step()
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(args, val_loader, model_flownet, model_raft, epoch, output_writers, experiment)
+            experiment, EPE = validate(args, train_loader, model_flownet, pwcnet, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -186,7 +190,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
     model_flownet = model_flownet.to(args.device)
 
     model_raft.eval()
-    model_raft = model_raft.to(args.device)
+    # model_raft = model_raft.to(args.device)
 
     criterion = SmoothL1Loss()
     end = time.time()
@@ -205,19 +209,20 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             # compute output
             frame1, frame2, feat1, feat2 = model_flownet(input)
             # print(f"input shape:{input[0].shape}, target shape:{target.shape}")
-            flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
-            flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
-            flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
-            flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
-            flow5 = model_raft(frame1[4], frame2[4], iters=args.nb_raft_iter, test_mode=True)
-            flow6 = model_raft(frame1[5], frame2[5], iters=args.nb_raft_iter, test_mode=True)
-
-            flows = (flow1, flow2, flow3, flow4, flow5, flow6)
+            cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
+            flow1 = model_raft(cat_frames)
+            # flow2 = model_raft(frame1[1], frame2[1])
+            # flow3 = model_raft(frame1[2], frame2[2])
+            # flow4 = model_raft(frame1[3], frame2[3])
+            # flow5 = model_raft(frame1[4], frame2[4])
+            # flow6 = model_raft(frame1[5], frame2[5])
+            #
+            # flows = (flow1, flow2, flow3, flow4, flow5, flow6)
 
             if not args.unsupervised:
-                # target_128 = tr_f.resize(target, flow3[1].shape[-1])
+                target_64 = tr_f.resize(target, flow1[0].shape[-1])
 
-                loss1_1 = loss_weights[0] * args.div_flow * criterion(flow1[1], flow_scales[0] * target)
+                loss1_1 = loss_weights[0] * criterion(args.div_flow*flow1[0], args.div_flow*flow_scales[0] * target_64[0])
                 # loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
                 # loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
                 # loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
@@ -225,8 +230,8 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
                 # loss6_1 = loss_weights[5] * args.div_flow * criterion(flow6[1], flow_scales[5] * target_128)
 
                 loss = loss1_1 #+ loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
-            else:
-                loss = warp_loss(feat1, feat2, flows, criterion)
+            # else:
+            #     loss = warp_loss(feat1, feat2, flows, criterion)
 
             tot_loss += loss.item()
 
@@ -265,7 +270,8 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
 
         # compute output
         frame1, frame2, feat1, feat2 = model_flownet(input)
-        flow1 = model_raft(frame1[0], frame2[0], iters=args.nb_raft_iter, test_mode=True)
+        cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
+        flow1 = model_raft(cat_frames)
         # flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
         # flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
         # flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
@@ -275,10 +281,15 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         # flows = (flow1, flow2, flow3, flow4, flow5, flow6)
         flows = flow1
         if not args.unsupervised:
-            loss = args.div_flow * criterion(flow1[1], target)
+            target_64 = tr_f.resize(target, flow1[0].shape[-1])
+            loss = criterion(args.div_flow*flow1[0], args.div_flow*target_64[0])
+            if loss < 2:
+                stop = 1
         else:
             loss = warp_loss(feat1, feat2, flows, criterion)
         tot_loss += loss.item()
+
+        # show_results(target_64[0], flow1[0], args.div_flow)
 
     max_val = 10
     avg_epe = (tot_loss/len(val_loader))
@@ -289,13 +300,23 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         'validation loss': avg_epe,
         'images': wandb.Image(input[0].cpu()),
         'flows': {
-            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
-            'pred': wandb.Image(flow2rgb(args.div_flow * flow1[1][0], max_value=max_val).transpose((1,2,0))),
+            'true': wandb.Image(flow2rgb(args.div_flow * target_64[0], max_value=max_val).transpose((1,2,0))),
+            'pred': wandb.Image(flow2rgb(args.div_flow * flow1[0], max_value=max_val).transpose((1,2,0))),
         },
         'step': n_iter,
         'epoch': epoch,
     })
+
     return experiment, avg_epe
+
+def show_results(target, pred, div_flow):
+    import matplotlib.pyplot as plt
+    target = flow2rgb(div_flow*target,10).transpose((1,2,0))
+    pred = flow2rgb(div_flow * pred, 10).transpose((1,2,0))
+    conc = np.hstack((target, pred))
+    plt.figure()
+    plt.imshow(conc)
+    done = 1
 
 
 if __name__ == '__main__':

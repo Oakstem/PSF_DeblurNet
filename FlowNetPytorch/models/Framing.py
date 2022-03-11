@@ -48,9 +48,9 @@ class Decoder(nn.Module):
     def __init__(self, device, input_channels = 3, levels = 6, batchNorm=True):
         super(Decoder,self).__init__()
 
-        # enc_features = [64, 128, 256, 512, 768, 1024]
+        enc_features = [64, 128, 256, 512, 768, 1024]
         # smaller version:
-        enc_features = [5, 10, 30, 50, 70, 90]
+        # enc_features = [5, 10, 30, 50, 70, 90]
         # dec_features = [50, 50, 50, 660, 960, 860]
         # current feature offset with densenet growth rate = 12:
         feature_offs = 60
@@ -84,8 +84,8 @@ class Decoder(nn.Module):
         self.flow5_up = Up(in_channels=3 * enc_features[4] + feature_offs, out_channels=3, ups_factor=14, target_sz=128)
         self.flow4_up = Up(in_channels=3 * enc_features[3] + feature_offs, out_channels=3, ups_factor=7, target_sz=128)
         self.flow3_up = Up(in_channels=3 * enc_features[2] + feature_offs, out_channels=3, ups_factor=3, target_sz=128)
-        self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs, out_channels=3, ups_factor=4, target_sz=264)
-        self.flow1_up = Up(in_channels=3 * enc_features[0] + feature_offs, out_channels=3, ups_factor=2, target_sz=264)
+        self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs, out_channels=3, ups_factor=4, target_sz=256)
+        self.flow1_up = Up(in_channels=3 * enc_features[0] + feature_offs, out_channels=3, ups_factor=2, target_sz=256)
 
         self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
