@@ -41,6 +41,9 @@ class SpatialTransformer(nn.Module):
         self.fc1 = nn.Linear(self.fc_features, 1024)
         self.fc2 = nn.Linear(1024, 6)
 
+        self.fc2.weight.data.zero_()
+        self.fc2.bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+
     def forward(self, x):
         """
         Forward pass of the STN module.
@@ -55,13 +58,13 @@ class SpatialTransformer(nn.Module):
         x = F.relu(self.conv3(x))
         x = F.max_pool2d(x, 2)
         x = F.relu(self.conv3(x))
-        if x.shape[-1] > 2:
-            x = F.max_pool2d(x, 4)
-        else:
-            x = F.max_pool2d(x, 2)
+        # if x.shape[-1] > 3:
+        #     x = F.max_pool2d(x, 6)
+        # else:
+        #     x = F.max_pool2d(x, 3)
         # Uncomment & replace maxpool for img size 256
-        # if x.shape[-1] > 1:
-        #     x = F.max_pool2d(x, 2)
+        if x.shape[-1] > 1:
+            x = F.max_pool2d(x, 2)
 
         # print("Pre view size:{}".format(x.size()))
         # div = np.prod(x.shape) // batch_images.shape[0]
@@ -83,6 +86,62 @@ class SpatialTransformer(nn.Module):
         rois = F.grid_sample(batch_images, affine_grid_points)
         # print("rois found to be of size:{}".format(rois.size()))
         return rois
+
+
+class SpatialTransformerSm(nn.Module):
+    def __init__(self):
+        super(SpatialTransformerSm, self).__init__()
+        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
+        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.conv2_drop = nn.Dropout2d()
+        self.fc1 = nn.Linear(320, 50)
+        self.fc2 = nn.Linear(50, 10)
+
+        # Spatial transformer localization-network
+        self.localization = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=7),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.Conv2d(8, 10, kernel_size=5),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True)
+        )
+
+        # Regressor for the 3 * 2 affine matrix
+        self.fc_loc = nn.Sequential(
+            nn.Linear(10 * 3 * 3, 32),
+            nn.ReLU(True),
+            nn.Linear(32, 3 * 2)
+        )
+
+        # Initialize the weights/bias with identity transformation
+        self.fc_loc[2].weight.data.zero_()
+        self.fc_loc[2].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+
+    # Spatial transformer network forward function
+    def stn(self, x):
+        xs = self.localization(x)
+        xs = xs.view(-1, 10 * 3 * 3)
+        theta = self.fc_loc(xs)
+        theta = theta.view(-1, 2, 3)
+
+        grid = F.affine_grid(theta, x.size())
+        x = F.grid_sample(x, grid)
+
+        return x
+
+    def forward(self, x):
+        # transform the input
+        x = self.stn(x)
+
+        # Perform the usual forward pass
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
+        x = x.view(-1, 320)
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, training=self.training)
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)
 
 
 

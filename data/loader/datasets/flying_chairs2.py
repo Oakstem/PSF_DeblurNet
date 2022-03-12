@@ -43,6 +43,10 @@ class FlyingChairs2(Dataset):
         return len(self.files_blurred)
 
     def __getitem__(self, index):
+        """Dataset parameters:
+        Train:
+        Input: Mean: tensor([0.5872, 0.5912, 0.5727]), Std: tensor([0.2253, 0.2319, 0.2542])
+        Target: Mean: tensor([-0.0008, -0.0094]), Std: tensor([0.6536, 0.6616])"""
 
         image_blurred_path = self.files_blurred[index]
         image_blurred: ndarray = self.load_image(image_blurred_path)
@@ -52,7 +56,7 @@ class FlyingChairs2(Dataset):
         image_blurred_channels = image_blurred.shape[2]
 
         transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.CenterCrop(self.img_size)])
+            [transforms.ToTensor(), transforms.CenterCrop(self.img_size), transforms.Normalize(mean=[0.5872, 0.5912, 0.5727], std=[0.2253, 0.2319, 0.2542])])
         image_blurred_tensor: Tensor = transform(image_blurred)
 
         transform = transforms.Compose(

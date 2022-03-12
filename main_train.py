@@ -42,10 +42,10 @@ def main():
     except:
         data_path = "/home/gentex/studies"
 
-    save_path = '{},{},{}epochs{},b{},lr{}'.format(
+    save_path = '{},{},{}epochs{},b{},lr{},lim{}'.format(
         args.arch, args.solver, args.epochs,
         ',epochSize'+str(args.epoch_size) if args.epoch_size > 0 else '',
-        args.batch_size, args.lr)
+        args.batch_size, args.lr, args.limit)
     if not args.no_date:
         timestamp = datetime.datetime.now().strftime("%m-%d-%H:%M")
         save_path = os.path.join(timestamp,save_path)
@@ -89,23 +89,26 @@ def main():
 
     # model = models.__dict__[args.arch](network_data).to(args.device)
 
-    # args.small = True
-    # args.mixed_precision = False
-    # model_raft = torch.nn.DataParallel(RAFT(args))
-    # if args.small:
-    #     raft_path = "raft-small.pth"
-    # else:
-    #     raft_path = "raft-sintel.pth"
-    # model_raft.load_state_dict(torch.load(
-    #     os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
-    #
-    # model_raft = model_raft.module
-    # model_raft.to(args.device)
-    # model_raft.eval()
-    pwc_model_fn = '/home/gentex/studies/PSF_DeblurNet/PWC_Net/PyTorch/pwc_net.pth.tar'
-    pwcnet = models.pwc_dc_net(pwc_model_fn)
-    pwcnet = pwcnet.cuda()
-    pwcnet.eval()
+    if args.estm_net == 'raft':
+        args.small = True
+        args.mixed_precision = False
+        model_raft = torch.nn.DataParallel(RAFT(args))
+        if args.small:
+            raft_path = "raft-small.pth"
+        else:
+            raft_path = "raft-sintel.pth"
+        model_raft.load_state_dict(torch.load(
+            os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
+
+        model_raft = model_raft.module
+        model_raft.to(args.device)
+        model_raft.eval()
+        flow_estimator = model_raft
+    else:
+        pwc_model_fn = '/home/gentex/studies/PSF_DeblurNet/PWC_Net/PyTorch/pwc_net.pth.tar'
+        flow_estimator = models.pwc_dc_net(pwc_model_fn)
+        flow_estimator = flow_estimator.cuda()
+    flow_estimator.eval()
 
     assert(args.solver in ['adam', 'sgd'])
     print('=> setting {} solver'.format(args.solver))
@@ -129,7 +132,8 @@ def main():
     #     best_EPE = validate(val_loader, model, raft_model, 0, output_writers, experiment)
     #     return
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=0.5, verbose=True)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=0.5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0, verbose=True)
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logging.info(f'''Starting training:
@@ -145,16 +149,19 @@ def main():
             ''')
     args.div_flow = 20
     args.nb_raft_iter = 8
+    args.upscale = None
     args.unsupervised = False
     # args.evaluate = True
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
         if not args.evaluate:
-            experiment = train(args, train_loader, model_flownet, pwcnet, optimizer, epoch, train_writer, experiment)
+            experiment = train(args, train_loader, model_flownet, flow_estimator, optimizer, epoch, train_writer, experiment)
             scheduler.step()
+            print(scheduler.get_last_lr())
+            experiment.log({'Learning rate':scheduler.get_last_lr()})
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(args, val_loader, model_flownet, pwcnet, epoch, output_writers, experiment)
+            experiment, EPE = validate(args, val_loader, model_flownet, flow_estimator, epoch, output_writers, experiment)
 
         if best_EPE < 0:
             best_EPE = EPE
@@ -168,6 +175,7 @@ def main():
             'arch': args.arch,
             'state_dict': model_flownet.module.state_dict(),
             # 'best_EPE': best_EPE,
+            'learning rate': scheduler.get_last_lr(),
             'div_flow': args.div_flow
         }, is_best=is_best, save_path=save_path)
 
@@ -189,9 +197,9 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
     model_flownet.train()
     model_flownet = model_flownet.to(args.device)
 
+    if args.estm_net == "raft":
+        model_raft = model_raft.to(args.device)
     model_raft.eval()
-    # model_raft = model_raft.to(args.device)
-
     criterion = SmoothL1Loss()
     end = time.time()
     loss_weights = [1, 0.08, 0.1, 0.13, 0.15, 0.2, 0.3]
@@ -203,14 +211,19 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             # measure data loading time
             # data_time.update(time.time() - end)
             target = target.to(args.device)
-            # input = torch.cat(input,1).to(args.device)
             input = input.to(args.device)
-            input = tr_f.resize(input, 512)
+            if args.upscale:
+                input = tr_f.resize(input, args.upscale)
             # compute output
             frame1, frame2, feat1, feat2 = model_flownet(input)
             # print(f"input shape:{input[0].shape}, target shape:{target.shape}")
-            # cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
-            flow1 = model_raft(feat1, feat2)
+
+            if args.estm_net == 'raft':
+                flow1 = model_raft(frame1, frame2)
+                # flow1 = flow1[8]
+            else:
+                cat_frames = torch.cat((frame1, frame2), dim=1)
+                flow1 = model_raft(cat_frames)
             # flow2 = model_raft(frame1[1], frame2[1])
             # flow3 = model_raft(frame1[2], frame2[2])
             # flow4 = model_raft(frame1[3], frame2[3])
@@ -220,9 +233,10 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             # flows = (flow1, flow2, flow3, flow4, flow5, flow6)
 
             if not args.unsupervised:
-                target_64 = tr_f.resize(target, flow1[0].shape[-1])
-
-                loss1_1 = loss_weights[0] * criterion(args.div_flow*flow1[0], args.div_flow*flow_scales[0] * target_64[0])
+                # target_64 = tr_f.resize(target, flow1[0].shape[-1])
+                loss1_1 = 0
+                for i in range(12):
+                    loss1_1 += criterion(args.div_flow*flow1[i], args.div_flow*flow_scales[0] * target)
                 # loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
                 # loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
                 # loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
@@ -267,11 +281,17 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         target = target.to(args.device)
         # input = torch.cat(input,1).to(args.device)
         input = input.to(args.device)
-        input = tr_f.resize(input, 512)
+        if args.upscale:
+            input = tr_f.resize(input, args.upscale)
         # compute output
         frame1, frame2, feat1, feat2 = model_flownet(input)
-        # cat_frames = torch.cat((frame1[0], frame2[0]), dim=1)
-        flow1 = model_raft(feat1, feat2)
+
+        if args.estm_net == 'raft':
+            flow1 = model_raft(frame1, frame2)
+            flow1 = flow1[0]
+        else:
+            cat_frames = torch.cat((frame1, frame2), dim=1)
+            flow1 = model_raft(cat_frames)
         # flow2 = model_raft(frame1[1], frame2[1], iters=args.nb_raft_iter, test_mode=True)
         # flow3 = model_raft(frame1[2], frame2[2], iters=args.nb_raft_iter, test_mode=True)
         # flow4 = model_raft(frame1[3], frame2[3], iters=args.nb_raft_iter, test_mode=True)
@@ -281,8 +301,8 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         # flows = (flow1, flow2, flow3, flow4, flow5, flow6)
         flows = flow1
         if not args.unsupervised:
-            target_64 = tr_f.resize(target, flow1[0].shape[-1])
-            loss = criterion(args.div_flow*flow1[0], args.div_flow*target_64[0])
+            # target_64 = tr_f.resize(target, flow1[0].shape[-1])
+            loss = criterion(args.div_flow*flow1, args.div_flow*target)
             if loss < 2:
                 stop = 1
         else:
@@ -301,7 +321,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         'images': wandb.Image(input[0].cpu()),
         'flows': {
             'true': wandb.Image(flow2rgb(args.div_flow * target_64[0], max_value=max_val).transpose((1,2,0))),
-            'pred': wandb.Image(flow2rgb(args.div_flow * flow1[0], max_value=max_val).transpose((1,2,0))),
+            'pred': wandb.Image(flow2rgb(2*args.div_flow * flow1[0], max_value=max_val).transpose((1,2,0))),
         },
         'step': n_iter,
         'epoch': epoch,

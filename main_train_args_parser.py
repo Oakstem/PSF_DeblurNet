@@ -5,8 +5,6 @@ from FlowNetPytorch import models
 
 
 def parse_arguments():
-    model_names = sorted(name for name in models.__dict__
-                         if name.islower() and not name.startswith("__"))
     dataset_names = sorted(name for name in data.__all__)
     parser: argparse.ArgumentParser = \
         argparse.ArgumentParser(description='PyTorch GoWithTheFlowNet Training on several datasets',
@@ -29,11 +27,10 @@ def parse_arguments():
         default=None,
         help="Seed the train-val split to enforce reproducibility (consistent restart too)",
     )
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='flownetc',
-                        choices=model_names,
-                        help='model architecture, overwritten if pretrained is specified: ' +
-                             ' | '.join(model_names))
-    parser.add_argument('--solver', default='adam', choices=['adam', 'sgd'],
+    parser.add_argument('--arch', '-a', metavar='ARCH', default='Go_PWC',
+                        choices=['Go_PWC'],
+                        help='model architecture, overwritten if pretrained is specified: ')
+    parser.add_argument('--solver', default='sgd', choices=['adam', 'sgd'],
                         help='solver algorithms')
     parser.add_argument('--data_path', '-dp', default='',
                         help='path to dataset')
@@ -47,9 +44,9 @@ def parse_arguments():
                         help='manual epoch number (useful on restarts)')
     parser.add_argument('--epoch-size', default=1000, type=int, metavar='N',
                         help='manual epoch size (will match dataset size if set to 0)')
-    parser.add_argument('-b', '--batch_size', default=1, type=int,
+    parser.add_argument('-b', '--batch_size', default=2, type=int,
                         metavar='N', help='mini-batch size')
-    parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float,
+    parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum for sgd, alpha parameter for adam')
@@ -77,7 +74,8 @@ def parse_arguments():
                         help='value by which flow will be divided. Original value is 20 but 1 with batchNorm gives good results')
     parser.add_argument('--milestones', default=[30, 60, 80], metavar='N', nargs='*',
                         help='epochs at which learning rate is divided by 2')
-
+    parser.add_argument('--estm_net', '-en', default='raft', choices=['pwc', 'raft'],
+                        help='Flow estimator to use, can choose RAFT / PWC')
 
     args: argparse.Namespace = parser.parse_args()
     return args
