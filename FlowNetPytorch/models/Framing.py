@@ -67,12 +67,12 @@ class Decoder(nn.Module):
 
         self.decoders = []
 
-        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[0], num_layers=4,  growth_rate=1).to(device))
-        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[1], growth_rate=1).to(device))
-        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[2], growth_rate=2).to(device))
-        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[3], growth_rate=3).to(device))
-        self.decoders.append(DenseBlock(num_input_features=3 * enc_features[4], growth_rate=4).to(device))
-        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[5], growth_rate=4).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[0], num_layers=4,  growth_rate=1).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[1], growth_rate=1).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[2], growth_rate=2).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[3], growth_rate=3).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[4], growth_rate=4).to(device))
+        self.decoders.append(DenseBlock(num_input_features=1 * enc_features[5], growth_rate=4).to(device))
 
         # self.dec_pwc6 = nn.Conv2d(2*enc_features[5]+feature_offs_5, 196, kernel_size=1, stride=1, padding=0, bias=False)
         # self.dec_pwc5 = nn.Conv2d(3 * enc_features[4] + feature_offs_5, 128, kernel_size=1, stride=1, padding=0, bias=False)
@@ -82,12 +82,12 @@ class Decoder(nn.Module):
         # self.dec_pwc1 = nn.Conv2d(3 * enc_features[0] + feature_offs_1, 16, kernel_size=1, stride=1, padding=0, bias=False)
 
 
-        self.dec6_up = deconv(2*enc_features[5]+feature_offs_5, enc_features[4])
-        self.dec5_up = deconv(3*enc_features[4]+feature_offs_5, enc_features[3])
-        self.dec4_up = deconv(3*enc_features[3]+feature_offs_4, enc_features[2])
-        self.dec3_up = deconv(3*enc_features[2]+feature_offs_3, enc_features[1])
-        self.dec2_up = deconv(3*enc_features[1]+feature_offs_2, enc_features[0])
-        self.dec1_up = deconv(3*enc_features[0]+feature_offs_1, input_channels)
+        self.dec6_up = deconv(1*enc_features[5]+feature_offs_5, enc_features[4])
+        self.dec5_up = deconv(2*enc_features[4]+feature_offs_5, enc_features[3])
+        self.dec4_up = deconv(2*enc_features[3]+feature_offs_4, enc_features[2])
+        self.dec3_up = deconv(2*enc_features[2]+feature_offs_3, enc_features[1])
+        self.dec2_up = deconv(2*enc_features[1]+feature_offs_2, enc_features[0])
+        self.dec1_up = deconv(2*enc_features[0]+feature_offs_1, input_channels)
 
         self.dec6_torgb = conv_block(batchNorm, enc_features[4], 3)
         self.dec5_torgb = conv(batchNorm, enc_features[3], 3)
@@ -102,17 +102,18 @@ class Decoder(nn.Module):
         # self.flow4_up = Up(in_channels=3 * enc_features[3] + feature_offs_4, out_channels=3, ups_factor=7, target_sz=128)
         # self.flow3_up = Up(in_channels=3 * enc_features[2] + feature_offs_3, out_channels=3, ups_factor=3, target_sz=128)
         # self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs_2, out_channels=3, ups_factor=4, target_sz=256)
-        self.flow1_up = Up(in_channels=3 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2, target_sz=target_sz)
+        self.flow1_up = Up(in_channels=2 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2, target_sz=target_sz)
 
-        self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
+        # self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
     def forward(self, encs):
-        trs = [self.trs[idx](enc) for idx, enc in enumerate(encs)]
+        # trs = [self.trs[idx](enc) for idx, enc in enumerate(encs)]
 
         # dec6 size: Bx860x5x5
         # upscaled output: Bx3x128x128
         # flow downscale factor: 128/264 = 0.5
-        dec6 = self.decoders[5](torch.cat((encs[5], trs[5]), dim=1))
+        # dec6 = self.decoders[5](torch.cat((encs[5], trs[5]), dim=1))
+        dec6 = self.decoders[5](encs[5])
         dec_up6 = crop_like(self.dec6_up(dec6), encs[4])
         # dec_pwc6 = self.dec_pwc6(dec6)
         # dec_rgb6 = self.flow6_up(dec6)
@@ -124,7 +125,7 @@ class Decoder(nn.Module):
         # dec5 size: Bx960x9x9
         # upscaled output: Bx3x128x128
         # flow downscale factor: 128/264 = 0.5
-        dec5 = self.decoders[4](torch.cat((encs[4], trs[4], dec_up6), dim=1))
+        dec5 = self.decoders[4](torch.cat((encs[4], dec_up6), dim=1))
         dec_up5 = crop_like(self.dec5_up(dec5), encs[3])
         # dec_pwc5 = self.dec_pwc5(dec5)
         # dec_rgb5 = self.flow5_up(dec5)
@@ -136,7 +137,7 @@ class Decoder(nn.Module):
         # dec4 size: Bx660x17x17
         # upscaled output: Bx3x264x264
         # flow downscale factor: 128/264 = 0.5
-        dec4 = self.decoders[3](torch.cat((encs[3], trs[3], dec_up5), dim=1))
+        dec4 = self.decoders[3](torch.cat((encs[3], dec_up5), dim=1))
         dec_up4 = crop_like(self.dec4_up(dec4), encs[2])
         # dec_pwc4 = self.dec_pwc4(dec4)
         # dec_rgb4 = self.flow4_up(dec4)
@@ -148,7 +149,7 @@ class Decoder(nn.Module):
         # dec3 size: Bx660x33x33
         # upscaled output: Bx3x128x128
         # flow downscale factor: 128/264 = 0.5
-        dec3 = self.decoders[2](torch.cat((encs[2], trs[2], dec_up4), dim=1))
+        dec3 = self.decoders[2](torch.cat((encs[2], dec_up4), dim=1))
         dec_up3 = crop_like(self.dec3_up(dec3), encs[1])
         # dec_pwc3 = self.dec_pwc3(dec3)
         # dec_rgb3 = self.flow3_up(dec3)
@@ -160,7 +161,7 @@ class Decoder(nn.Module):
         # dec2 size: Bx360x66x66
         # upscaled output: Bx3x264x264
         # flow downscale factor: 264/264 = 1.0
-        dec2 = self.decoders[1](torch.cat((encs[1], trs[1], dec_up3), dim=1))
+        dec2 = self.decoders[1](torch.cat((encs[1], dec_up3), dim=1))
         dec_up2 = crop_like(self.dec2_up(dec2), encs[0])
         # dec_pwc2 = self.dec_pwc2(dec2)
         # dec_rgb2 = self.flow2_up(dec2)
@@ -172,7 +173,7 @@ class Decoder(nn.Module):
         # dec1 size: Bx210x132x132
         # upscaled output: Bx3x264x264
         # flow downscale factor: 264/264 = 1.0
-        dec1 = self.decoders[0](torch.cat((encs[0], trs[0], dec_up2), dim=1))
+        dec1 = self.decoders[0](torch.cat((encs[0], dec_up2), dim=1))
         dec_rgb1 = self.flow1_up(dec1)
         # dec_pwc1 = self.dec_pwc1(dec1)
         # dec_up1 = self.dec1_up(dec1)

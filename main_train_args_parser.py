@@ -30,7 +30,7 @@ def parse_arguments():
     parser.add_argument('--arch', '-a', metavar='ARCH', default='Go_PWC',
                         choices=['Go_PWC'],
                         help='model architecture, overwritten if pretrained is specified: ')
-    parser.add_argument('--solver', default='sgd', choices=['adam', 'sgd'],
+    parser.add_argument('--solver', default='adam', choices=['adam', 'sgd'],
                         help='solver algorithms')
     parser.add_argument('--data_path', '-dp', default='',
                         help='path to dataset')
@@ -46,7 +46,7 @@ def parse_arguments():
                         help='manual epoch size (will match dataset size if set to 0)')
     parser.add_argument('-b', '--batch_size', default=2, type=int,
                         metavar='N', help='mini-batch size')
-    parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+    parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum for sgd, alpha parameter for adam')
@@ -66,7 +66,7 @@ def parse_arguments():
                         metavar='N', help='print frequency')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', dest='pretrained', default="",
+    parser.add_argument('--pretrained', dest='pretrained', default="checkpoint.pth.tar",
                         help='path to pre-trained model')
     parser.add_argument('--no-date', action='store_false',
                         help='don\'t append date timestamp to folder')

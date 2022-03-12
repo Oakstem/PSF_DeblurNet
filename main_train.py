@@ -237,6 +237,7 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
                 loss1_1 = 0
                 for i in range(12):
                     loss1_1 += criterion(args.div_flow*flow1[i], args.div_flow*flow_scales[0] * target)
+                # loss1_1 = criterion(args.div_flow * flow1[5], args.div_flow * flow_scales[0] * target)
                 # loss2_1 = loss_weights[1] * args.div_flow * criterion(flow2[1], flow_scales[1] * target)
                 # loss3_1 = loss_weights[2] * args.div_flow * criterion(flow3[1], flow_scales[2] * target_128)
                 # loss4_1 = loss_weights[3] * args.div_flow * criterion(flow4[1], flow_scales[3] * target_128)
@@ -288,7 +289,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
 
         if args.estm_net == 'raft':
             flow1 = model_raft(frame1, frame2)
-            flow1 = flow1[0]
+            flow1 = flow1[5]
         else:
             cat_frames = torch.cat((frame1, frame2), dim=1)
             flow1 = model_raft(cat_frames)
@@ -320,7 +321,7 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         'validation loss': avg_epe,
         'images': wandb.Image(input[0].cpu()),
         'flows': {
-            'true': wandb.Image(flow2rgb(args.div_flow * target_64[0], max_value=max_val).transpose((1,2,0))),
+            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
             'pred': wandb.Image(flow2rgb(2*args.div_flow * flow1[0], max_value=max_val).transpose((1,2,0))),
         },
         'step': n_iter,
