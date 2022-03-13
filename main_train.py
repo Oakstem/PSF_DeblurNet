@@ -21,6 +21,7 @@ import datetime
 from FlowNetPytorch.util import flow2rgb, save_checkpoint
 from FlowNetPytorch.models.util import warp_loss
 from torch.nn import SmoothL1Loss
+
 # from PWC_Net.PyTorch import models
 
 best_EPE = -1
@@ -30,7 +31,6 @@ n_iter = int(0)
 def main():
     global best_EPE, n_iter
     args: argparse.Namespace = parse_arguments()
-    # args.evaluate = True
 
     try:
         import colab
@@ -44,12 +44,12 @@ def main():
 
     save_path = '{},{},{}epochs{},b{},lr{},lim{}'.format(
         args.arch, args.solver, args.epochs,
-        ',epochSize'+str(args.epoch_size) if args.epoch_size > 0 else '',
+        ',epochSize' + str(args.epoch_size) if args.epoch_size > 0 else '',
         args.batch_size, args.lr, args.limit)
     if not args.no_date:
         timestamp = datetime.datetime.now().strftime("%m-%d-%H:%M")
-        save_path = os.path.join(timestamp,save_path)
-    save_path = os.path.join(args.dataset,save_path)
+        save_path = os.path.join(timestamp, save_path)
+    save_path = os.path.join(args.dataset, save_path)
     print('=> will save everything to {}'.format(save_path))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -58,28 +58,25 @@ def main():
         np.random.seed(args.split_seed)
 
     # (Initialize logging)
-    experiment = wandb.init(project='GoWithTheFlowNet', resume='allow', anonymous='must')
+    wandb_log = wandb.init(project='GoWithTheFlowNet', resume='allow', anonymous='must')
 
-    experiment.config.update(dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr,
-                                  val_percent=0.1, save_checkpoint=True, img_scale=1,
-                                  amp=False))
-    train_writer = []
-    test_writer = []
-
-    output_writers = []
-
+    wandb_log.config.update(dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr,
+                                 val_percent=0.1, save_checkpoint=True, img_scale=1, amp=False))
 
     print("=> fetching img pairs in '{}'".format(data_path))
 
-    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit, data_type=args.dataset)
-    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit, data_type=args.dataset)
+    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit,
+                             data_type=args.dataset)
+    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit,
+                           data_type=args.dataset)
     args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model_flownet = GoWithTheFlownet(args.device)
     model_flownet.to(args.device)
 
     # create model
     if args.pretrained:
-        network_data = torch.load(os.path.join("FlowNetPytorch", "checkpoints", args.pretrained), map_location=args.device)
+        network_data = torch.load(os.path.join("FlowNetPytorch", "checkpoints", args.pretrained),
+                                  map_location=args.device)
         args.arch = network_data['arch']
         model_flownet.load_state_dict(network_data['state_dict'])
         print("=> using pre-trained model '{}'".format(args.arch))
@@ -110,7 +107,7 @@ def main():
         flow_estimator = flow_estimator.cuda()
     flow_estimator.eval()
 
-    assert(args.solver in ['adam', 'sgd'])
+    assert (args.solver in ['adam', 'sgd'])
     print('=> setting {} solver'.format(args.solver))
     # param_groups = [{'params': model.bias_parameters(), 'weight_decay': args.bias_decay},
     #                 {'params': model.weight_parameters(), 'weight_decay': args.weight_decay}]
@@ -122,17 +119,10 @@ def main():
 
     optimizer: torch.optim.Optimizer = None
     if args.solver == 'adam':
-        optimizer = torch.optim.Adam(param_groups, args.lr,
-                                     betas=(args.momentum, args.beta))
+        optimizer = torch.optim.Adam(param_groups, args.lr, betas=(args.momentum, args.beta))
     elif args.solver == 'sgd':
-        optimizer = torch.optim.SGD(param_groups, args.lr,
-                                    momentum=args.momentum)
+        optimizer = torch.optim.SGD(param_groups, args.lr, momentum=args.momentum)
 
-    # if args.evaluate:
-    #     best_EPE = validate(val_loader, model, raft_model, 0, output_writers, experiment)
-    #     return
-
-    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=0.5, verbose=True)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=150, eta_min=0, verbose=True)
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -145,95 +135,77 @@ def main():
                 Checkpoints:     {True}
                 Device:          {args.device.type}
                 Images scaling:  {1}
-                Mixed Precision: {False}
-            ''')
+                Mixed Precision: {False}''')
     args.div_flow = 20
     args.nb_raft_iter = 8
     args.upscale = None
     args.unsupervised = False
-    # args.evaluate = True
+
     for epoch in range(args.start_epoch, args.epochs):
-        # train for one epoch
         if not args.evaluate:
-            experiment = train(args, train_loader, model_flownet, flow_estimator, optimizer, epoch, train_writer, experiment)
+            train_one_epoch(args, train_loader, model_flownet, flow_estimator, optimizer, epoch, wandb_log)
             scheduler.step()
             print(scheduler.get_last_lr())
-            experiment.log({'Learning rate':scheduler.get_last_lr()})
+            wandb_log.log({'Learning rate': scheduler.get_last_lr()})
+
         # evaluate on validation set
         with torch.no_grad():
-            experiment, EPE = validate(args, val_loader, model_flownet, flow_estimator, epoch, output_writers, experiment)
+            EPE = validate(args, val_loader, model_flownet, flow_estimator, epoch, wandb_log)
 
         if best_EPE < 0:
             best_EPE = EPE
-        #
+
         is_best = EPE < best_EPE
         best_EPE = min(EPE, best_EPE)
         if is_best:
             print("Best eval EPE recorded!")
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'arch': args.arch,
-            'state_dict': model_flownet.module.state_dict(),
-            # 'best_EPE': best_EPE,
-            'learning rate': scheduler.get_last_lr(),
-            'div_flow': args.div_flow
-        }, is_best=is_best, save_path=save_path)
+        save_checkpoint({'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model_flownet.module.state_dict(),
+                         'learning rate': scheduler.get_last_lr(), 'div_flow': args.div_flow},
+                        is_best=is_best, save_path=save_path)
 
 
-def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train_writer, experiment):
+def train_one_epoch(args, train_loader, model_flownet, model_raft, optimizer, epoch, wandb_log):
     global n_iter
-    # batch_time = AverageMeter()
-    # data_time = AverageMeter()
-    # losses = AverageMeter()
-    # flow2_EPEs = AverageMeter()
 
-    epoch_size = len(train_loader) if args.epoch_size == 0 else min(len(train_loader), args.epoch_size)
-
-    # switch to train mode
     try:
         model_flownet = model_flownet.module
     except:
-        None
+        pass
+
+    # switch to train mode
     model_flownet.train()
     model_flownet = model_flownet.to(args.device)
 
     if args.estm_net == "raft":
         model_raft = model_raft.to(args.device)
     model_raft.eval()
+
     criterion = SmoothL1Loss()
-    end = time.time()
     loss_weights = [0.22, 0.18, 0.14, 0.11, 0.09, 0.07, 0.05, 0.05, 0.04, 0.03, 0.02, 0.01]
     flow_scales = [1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
-    with tqdm(total=len(train_loader)*args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
+    with tqdm(total=len(train_loader) * args.batch_size, desc=f'Epoch {epoch + 1}/{args.epochs}', unit='img') as pbar:
 
         tot_loss = 0
         for i, (input, target, idx) in enumerate(train_loader):
-            # measure data loading time
-            # data_time.update(time.time() - end)
+
             target = target.to(args.device)
             input = input.to(args.device)
             if args.upscale:
                 input = tr_f.resize(input, args.upscale)
+
             # compute output
             frame1, frame2, feat1, feat2 = model_flownet(input)
 
             if args.estm_net == 'raft':
                 flow1 = model_raft(frame1, frame2)
-                # flow1 = flow1[8]
             else:
                 cat_frames = torch.cat((frame1, frame2), dim=1)
                 flow1 = model_raft(cat_frames)
 
             if not args.unsupervised:
-                # target_64 = tr_f.resize(target, flow1[0].shape[-1])
                 loss = 0
                 for i in range(12):
-                    loss += loss_weights[i]*criterion(flow1[i], flow_scales[0] * target)
-
-
-                # loss = loss1_1 #+ loss2_1 + loss3_1 + loss4_1 + loss5_1 + loss6_1
-            # else:
-            #     loss = warp_loss(feat1, feat2, flows, criterion)
+                    loss += loss_weights[i] * criterion(flow1[i], flow_scales[0] * target)
 
             tot_loss += loss.item()
 
@@ -242,19 +214,13 @@ def train(args, train_loader, model_flownet, model_raft, optimizer, epoch, train
             optimizer.step()
 
             pbar.update(input.shape[0])
-            experiment.log({
-                'train loss': tot_loss/(i+1),
-                'step': n_iter,
-                'epoch': epoch
-            })
-            pbar.set_postfix(**{'loss (batch)': tot_loss/(i+1)})
+            wandb_log.log({'train loss': tot_loss / (i + 1), 'step': n_iter, 'epoch': epoch})
+            pbar.set_postfix(**{'loss (batch)': tot_loss / (i + 1)})
 
             n_iter += 1
-    return experiment
 
 
-def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers, experiment):
-
+def validate(args, val_loader, model_flownet, model_raft, epoch, wandb_log):
     # switch to evaluate mode
     model_flownet.eval()
     model_raft.eval()
@@ -263,7 +229,6 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
     model_raft.to(args.device)
 
     criterion = SmoothL1Loss()
-    loss_weights = [0.20, 0.35, 0.45]
     tot_loss = 0
     for i, (input, target, idx) in enumerate(val_loader):
         target = target.to(args.device)
@@ -284,36 +249,33 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, output_writers,
         flows = flow1
         if not args.unsupervised:
             # target_64 = tr_f.resize(target, flow1[0].shape[-1])
-            loss = criterion(args.div_flow*flow1, args.div_flow*target)
+            loss = criterion(args.div_flow * flow1, args.div_flow * target)
             if loss < 2:
                 stop = 1
         else:
             loss = warp_loss(feat1, feat2, flows, criterion)
         tot_loss += loss.item()
 
-
     max_val = 10
-    avg_epe = (tot_loss/len(val_loader))
+    avg_epe = (tot_loss / len(val_loader))
     logging.info('Validation epe score: {}'.format(avg_epe))
-    # print(f"target shape:{target.shape}, flow1 shape:{flow1[1][0].shape}")
-    experiment.log({
-        'learning rate': args.lr,
-        'validation loss': avg_epe,
-        'images': wandb.Image(input[0].cpu()),
-        'flows': {
-            'true': wandb.Image(flow2rgb(args.div_flow * target[0], max_value=max_val).transpose((1,2,0))),
-            'pred': wandb.Image(flow2rgb(2*args.div_flow * flow1[0], max_value=max_val).transpose((1,2,0))),
-        },
-        'step': n_iter,
-        'epoch': epoch,
-    })
+    wandb_log.log({'learning rate': args.lr,
+                   'validation loss': avg_epe,
+                   'images': wandb.Image(input[0].cpu()),
+                   'flows': { 'true': wandb.Image(flow2rgb(args.div_flow * target[0],
+                                                           max_value=max_val).transpose((1, 2, 0))),
+                              'pred': wandb.Image(flow2rgb(2 * args.div_flow * flow1[0],
+                                                           max_value=max_val).transpose((1, 2, 0))),},
+                   'step': n_iter,
+                   'epoch': epoch,})
 
-    return experiment, avg_epe
+    return avg_epe
+
 
 def show_results(target, pred, div_flow):
     import matplotlib.pyplot as plt
-    target = flow2rgb(div_flow*target,10).transpose((1,2,0))
-    pred = flow2rgb(div_flow * pred, 10).transpose((1,2,0))
+    target = flow2rgb(div_flow * target, 10).transpose((1, 2, 0))
+    pred = flow2rgb(div_flow * pred, 10).transpose((1, 2, 0))
     conc = np.hstack((target, pred))
     plt.figure()
     plt.imshow(conc)
