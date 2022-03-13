@@ -11,7 +11,8 @@ class GoWithTheFlownet(nn.Module):
     def __init__(self, device, input_channels=3, batchNorm=True):
         super(GoWithTheFlownet,self).__init__()
 
-        enc_features = [32, 64, 128, 256, 512, 768]
+        # enc_features = [32, 64, 128, 256, 512, 768]
+        enc_features = [256, 384, 512, 768, 1024, 1280]
         self.encoder = Encoder(input_channels=input_channels, batchNorm=batchNorm, enc_features=enc_features).to(device)
 
         self.decoder_l = Decoder(device, enc_features)
