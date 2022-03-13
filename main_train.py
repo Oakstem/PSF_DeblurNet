@@ -22,8 +22,6 @@ from FlowNetPytorch.util import flow2rgb, save_checkpoint
 from FlowNetPytorch.models.util import warp_loss
 from torch.nn import SmoothL1Loss
 
-# from PWC_Net.PyTorch import models
-
 best_EPE = -1
 n_iter = int(0)
 
@@ -32,85 +30,23 @@ def main():
     global best_EPE, n_iter
     args: argparse.Namespace = parse_arguments()
 
-    try:
-        import colab
-        # data_path = "/content/drive/MyDrive/test_chairs"
-        if args.dataset == 'monkaa':
-            data_path = "/content/drive/MyDrive/test_chairs"
-        else:
-            data_path = "/content/drive/MyDrive/Colab Notebooks"
-    except:
-        data_path = "/home/gentex/studies"
+    data_path, train_loader, val_loader = get_dataloaders(args)
 
-    save_path = '{},{},{}epochs{},b{},lr{},lim{}'.format(
-        args.arch, args.solver, args.epochs,
-        ',epochSize' + str(args.epoch_size) if args.epoch_size > 0 else '',
-        args.batch_size, args.lr, args.limit)
-    if not args.no_date:
-        timestamp = datetime.datetime.now().strftime("%m-%d-%H:%M")
-        save_path = os.path.join(timestamp, save_path)
-    save_path = os.path.join(args.dataset, save_path)
-    print('=> will save everything to {}'.format(save_path))
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
+    save_checkpoints_path = get_save_checkpoints_path(args)
 
     if args.split_seed is not None:
         np.random.seed(args.split_seed)
 
-    # (Initialize logging)
-    wandb_log = wandb.init(project='GoWithTheFlowNet', resume='allow', anonymous='must')
-
-    wandb_log.config.update(dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr,
-                                 val_percent=0.1, save_checkpoint=True, img_scale=1, amp=False))
-
-    print("=> fetching img pairs in '{}'".format(data_path))
-
-    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit,
-                             data_type=args.dataset)
-    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit,
-                           data_type=args.dataset)
     args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model_flownet = GoWithTheFlownet(args.device)
-    model_flownet.to(args.device)
 
-    # create model
-    if args.pretrained:
-        network_data = torch.load(os.path.join("FlowNetPytorch", "checkpoints", args.pretrained),
-                                  map_location=args.device)
-        args.arch = network_data['arch']
-        model_flownet.load_state_dict(network_data['state_dict'])
-        print("=> using pre-trained model '{}'".format(args.arch))
-    else:
-        network_data = None
-        print("=> creating model '{}'".format(args.arch))
+    wandb_log = get_wandb_logger(args)
 
-    # model = models.__dict__[args.arch](network_data).to(args.device)
+    model_flownet = get_model_flownet(args)
 
-    if args.estm_net == 'raft':
-        args.small = True
-        args.mixed_precision = False
-        model_raft = torch.nn.DataParallel(RAFT(args))
-        if args.small:
-            raft_path = "raft-small.pth"
-        else:
-            raft_path = "raft-sintel.pth"
-        model_raft.load_state_dict(torch.load(
-            os.path.join("FlowNetPytorch", "models", raft_path), map_location=args.device))
-
-        model_raft = model_raft.module
-        model_raft.to(args.device)
-        model_raft.eval()
-        flow_estimator = model_raft
-    else:
-        pwc_model_fn = '/home/gentex/studies/PSF_DeblurNet/PWC_Net/PyTorch/pwc_net.pth.tar'
-        flow_estimator = models.pwc_dc_net(pwc_model_fn)
-        flow_estimator = flow_estimator.cuda()
-    flow_estimator.eval()
+    flow_estimator = get_flow_estimator(args)
 
     assert (args.solver in ['adam', 'sgd'])
     print('=> setting {} solver'.format(args.solver))
-    # param_groups = [{'params': model.bias_parameters(), 'weight_decay': args.bias_decay},
-    #                 {'params': model.weight_parameters(), 'weight_decay': args.weight_decay}]
     param_groups = [{'params': model_flownet.parameters(), 'weight_decay': args.weight_decay}]
 
     if args.device.type == "cuda":
@@ -141,6 +77,106 @@ def main():
     args.upscale = None
     args.unsupervised = False
 
+    run_train_and_evaluate(args, flow_estimator, model_flownet, optimizer, save_checkpoints_path, scheduler,
+                           train_loader, val_loader, wandb_log)
+
+
+def get_dataloaders(args):
+    try:
+        import colab
+        # data_path = "/content/drive/MyDrive/test_chairs"
+        if args.dataset == 'monkaa':
+            data_path = "/content/drive/MyDrive/test_chairs"
+        else:
+            data_path = "/content/drive/MyDrive/Colab Notebooks"
+    except:
+        data_path = "/Users/mishka/Downloads/"
+
+    print("=> fetching img pairs in '{}'".format(data_path))
+
+    train_loader = load_data(data_path, args.batch_size, train=True, shuffle=True, limit=args.limit,
+                             data_type=args.dataset)
+    val_loader = load_data(data_path, args.batch_size, train=False, shuffle=True, limit=args.limit,
+                           data_type=args.dataset)
+
+    return data_path, train_loader, val_loader
+
+
+def get_save_checkpoints_path(args):
+    save_checkpoints_path = '{},{},{}epochs{},b{},lr{},lim{}'.format(
+        args.arch, args.solver, args.epochs,
+        ',epochSize' + str(args.epoch_size) if args.epoch_size > 0 else '',
+        args.batch_size, args.lr, args.limit)
+    if not args.no_date:
+        timestamp = datetime.datetime.now().strftime("%m-%d-%H:%M")
+        save_checkpoints_path = os.path.join(timestamp, save_checkpoints_path)
+    save_checkpoints_path = os.path.join(args.dataset, save_checkpoints_path)
+    print('=> will save everything to {}'.format(save_checkpoints_path))
+    if not os.path.exists(save_checkpoints_path):
+        os.makedirs(save_checkpoints_path)
+    return save_checkpoints_path
+
+
+def get_wandb_logger(args):
+    # (Initialize logging)
+    wandb_log = wandb.init(project='GoWithTheFlowNet', resume='allow', anonymous='must')
+    wandb_log.config.update(dict(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr,
+                                 val_percent=0.1, save_checkpoint=True, img_scale=1, amp=False))
+    return wandb_log
+
+
+def get_model_flownet(args):
+    model_flownet = GoWithTheFlownet(args.device)
+    model_flownet.to(args.device)
+
+    # load model
+    if args.pretrained:
+        try:
+            network_data = torch.load(os.path.join("FlowNetPytorch", "checkpoints", args.pretrained),
+                                      map_location=args.device)
+            args.arch = network_data['arch']
+            model_flownet.load_state_dict(network_data['state_dict'])
+            print("=> using pre-trained model '{}'".format(args.arch))
+        except:
+            pass
+    else:
+        print("=> creating model '{}'".format(args.arch))
+
+    return model_flownet
+
+
+def get_flow_estimator(args):
+    if args.estm_net == 'raft':
+        args.small = True
+        args.mixed_precision = False
+        model_raft = torch.nn.DataParallel(RAFT(args))
+        if args.small:
+            raft_path = "raft-small.pth"
+        else:
+            raft_path = "raft-sintel.pth"
+        try:
+            model_raft.load_state_dict(torch.load(os.path.join("FlowNetPytorch", "models", raft_path),
+                                                  map_location=args.device))
+        except:
+            pass
+
+        model_raft = model_raft.module
+        model_raft.to(args.device)
+        model_raft.eval()
+        flow_estimator = model_raft
+    else:
+        pwc_model_fn = '/home/gentex/studies/PSF_DeblurNet/PWC_Net/PyTorch/pwc_net.pth.tar'
+        from PWC_Net.PyTorch import models
+        flow_estimator = models.pwc_dc_net(pwc_model_fn)
+        flow_estimator = flow_estimator.cuda()
+
+    flow_estimator.eval()
+    return flow_estimator
+
+
+def run_train_and_evaluate(args, flow_estimator, model_flownet, optimizer, save_checkpoints_path, scheduler,
+                           train_loader, val_loader, wandb_log):
+    global best_EPE
     for epoch in range(args.start_epoch, args.epochs):
         if not args.evaluate:
             train_one_epoch(args, train_loader, model_flownet, flow_estimator, optimizer, epoch, wandb_log)
@@ -161,7 +197,7 @@ def main():
             print("Best eval EPE recorded!")
         save_checkpoint({'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model_flownet.module.state_dict(),
                          'learning rate': scheduler.get_last_lr(), 'div_flow': args.div_flow},
-                        is_best=is_best, save_path=save_path)
+                        is_best=is_best, save_path=save_checkpoints_path)
 
 
 def train_one_epoch(args, train_loader, model_flownet, model_raft, optimizer, epoch, wandb_log):
@@ -270,16 +306,6 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, wandb_log):
                    'epoch': epoch,})
 
     return avg_epe
-
-
-def show_results(target, pred, div_flow):
-    import matplotlib.pyplot as plt
-    target = flow2rgb(div_flow * target, 10).transpose((1, 2, 0))
-    pred = flow2rgb(div_flow * pred, 10).transpose((1, 2, 0))
-    conc = np.hstack((target, pred))
-    plt.figure()
-    plt.imshow(conc)
-    done = 1
 
 
 if __name__ == '__main__':
