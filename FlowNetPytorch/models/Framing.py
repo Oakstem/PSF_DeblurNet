@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from .STNModule import SpatialTransformer, SpatialTransformerSm
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 from .util import conv, conv_block, deconv, crop_like, Up
@@ -9,7 +8,7 @@ from .util import conv, conv_block, deconv, crop_like, Up
 
 class GoWithTheFlownet(nn.Module):
     def __init__(self, device, input_channels=3, batchNorm=True):
-        super(GoWithTheFlownet,self).__init__()
+        super(GoWithTheFlownet, self).__init__()
 
         # enc_features = [32, 64, 128, 256, 512, 768]
         enc_features = [256, 384, 512, 768, 1024, 1280]
@@ -27,17 +26,16 @@ class GoWithTheFlownet(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, enc_features, input_channels = 3, batchNorm=True):
-        super(Encoder,self).__init__()
+    def __init__(self, enc_features, input_channels=3, batchNorm=True):
+        super(Encoder, self).__init__()
 
         self.batchNorm = batchNorm
-        self.conv1   = conv_block(self.batchNorm,  input_channels,   enc_features[0])
-        self.conv2   = conv_block(self.batchNorm,  enc_features[0],  enc_features[1])
-        self.conv3   = conv_block(self.batchNorm, enc_features[1],  enc_features[2])
-        self.conv4   = conv_block(self.batchNorm, enc_features[2],  enc_features[3])
-        self.conv5   = conv_block(self.batchNorm, enc_features[3],  enc_features[4])
-        self.conv6   = conv_block(self.batchNorm, enc_features[4],  enc_features[5])
-
+        self.conv1 = conv_block(self.batchNorm, input_channels, enc_features[0])
+        self.conv2 = conv_block(self.batchNorm, enc_features[0], enc_features[1])
+        self.conv3 = conv_block(self.batchNorm, enc_features[1], enc_features[2])
+        self.conv4 = conv_block(self.batchNorm, enc_features[2], enc_features[3])
+        self.conv5 = conv_block(self.batchNorm, enc_features[3], enc_features[4])
+        self.conv6 = conv_block(self.batchNorm, enc_features[4], enc_features[5])
 
     def forward(self, x):
         enc1 = self.conv1(x)
@@ -51,8 +49,8 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, device, enc_features, input_channels = 3, levels=6, target_sz=256, batchNorm=True):
-        super(Decoder,self).__init__()
+    def __init__(self, device, enc_features, input_channels=3, levels=6, target_sz=256, batchNorm=True):
+        super(Decoder, self).__init__()
         self.target_sz = target_sz
 
         # smaller version:
@@ -65,10 +63,9 @@ class Decoder(nn.Module):
         feature_offs_2 = 5
         feature_offs_1 = 4
 
-
         self.decoders = []
 
-        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[0], num_layers=4,  growth_rate=1).to(device))
+        self.decoders.append(DenseBlock(num_input_features=2 * enc_features[0], num_layers=4, growth_rate=1).to(device))
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[1], growth_rate=1).to(device))
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[2], growth_rate=2).to(device))
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[3], growth_rate=3).to(device))
@@ -82,13 +79,12 @@ class Decoder(nn.Module):
         # self.dec_pwc2 = nn.Conv2d(3 * enc_features[1] + feature_offs_2, 32, kernel_size=1, stride=1, padding=0, bias=False)
         # self.dec_pwc1 = nn.Conv2d(3 * enc_features[0] + feature_offs_1, 16, kernel_size=1, stride=1, padding=0, bias=False)
 
-
-        self.dec6_up = deconv(1*enc_features[5]+feature_offs_5, enc_features[4])
-        self.dec5_up = deconv(2*enc_features[4]+feature_offs_5, enc_features[3])
-        self.dec4_up = deconv(2*enc_features[3]+feature_offs_4, enc_features[2])
-        self.dec3_up = deconv(2*enc_features[2]+feature_offs_3, enc_features[1])
-        self.dec2_up = deconv(2*enc_features[1]+feature_offs_2, enc_features[0])
-        self.dec1_up = deconv(2*enc_features[0]+feature_offs_1, input_channels)
+        self.dec6_up = deconv(1 * enc_features[5] + feature_offs_5, enc_features[4])
+        self.dec5_up = deconv(2 * enc_features[4] + feature_offs_5, enc_features[3])
+        self.dec4_up = deconv(2 * enc_features[3] + feature_offs_4, enc_features[2])
+        self.dec3_up = deconv(2 * enc_features[2] + feature_offs_3, enc_features[1])
+        self.dec2_up = deconv(2 * enc_features[1] + feature_offs_2, enc_features[0])
+        self.dec1_up = deconv(2 * enc_features[0] + feature_offs_1, input_channels)
 
         self.dec6_torgb = conv_block(batchNorm, enc_features[4], 3)
         self.dec5_torgb = conv(batchNorm, enc_features[3], 3)
@@ -103,7 +99,8 @@ class Decoder(nn.Module):
         # self.flow4_up = Up(in_channels=3 * enc_features[3] + feature_offs_4, out_channels=3, ups_factor=7, target_sz=128)
         # self.flow3_up = Up(in_channels=3 * enc_features[2] + feature_offs_3, out_channels=3, ups_factor=3, target_sz=128)
         # self.flow2_up = Up(in_channels=3 * enc_features[1] + feature_offs_2, out_channels=3, ups_factor=4, target_sz=256)
-        self.flow1_up = Up(in_channels=2 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2, target_sz=target_sz)
+        self.flow1_up = Up(in_channels=2 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2,
+                           target_sz=target_sz)
 
         # self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
@@ -305,6 +302,7 @@ class DenseLayer(nn.Module):
 
 class DenseBlock(nn.ModuleDict):
     _version = 2
+
     # The paper states good values for growth rate: 12, 24, 32, 40
     def __init__(self, num_input_features, num_layers=5, bn_size=4, growth_rate=4, drop_rate=0, memory_efficient=False):
         super(DenseBlock, self).__init__()
