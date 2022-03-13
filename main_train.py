@@ -195,18 +195,13 @@ def run_train_and_evaluate(args, flow_estimator, model_flownet, optimizer, save_
         best_EPE = min(EPE, best_EPE)
         if is_best:
             print("Best eval EPE recorded!")
-        save_checkpoint({'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model_flownet.module.state_dict(),
+        save_checkpoint({'epoch': epoch + 1, 'arch': args.arch, 'state_dict': model_flownet.state_dict(),
                          'learning rate': scheduler.get_last_lr(), 'div_flow': args.div_flow},
                         is_best=is_best, save_path=save_checkpoints_path)
 
 
 def train_one_epoch(args, train_loader, model_flownet, model_raft, optimizer, epoch, wandb_log):
     global n_iter
-
-    try:
-        model_flownet = model_flownet.module
-    except:
-        pass
 
     # switch to train mode
     model_flownet.train()
