@@ -24,7 +24,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-data/Monkaa/*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -141,5 +140,3 @@ flownet2-pytorch/
 RAFT/
 *.tar
 wandb/
-
-
