@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch import Tensor
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
+from torch.nn import ModuleList
+
 from .util import conv, conv_block, deconv, crop_like, Up
 
 
@@ -63,7 +65,7 @@ class Decoder(nn.Module):
         feature_offs_2 = 5
         feature_offs_1 = 4
 
-        self.decoders = []
+        self.decoders = ModuleList()
 
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[0], num_layers=4, growth_rate=1).to(device))
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[1], growth_rate=1).to(device))
