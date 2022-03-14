@@ -84,7 +84,6 @@ def main():
 def get_dataloaders(args):
     try:
         import colab
-        # data_path = "/content/drive/MyDrive/test_chairs"
         if args.dataset == 'monkaa':
             data_path = "/content/drive/MyDrive/test_chairs"
         else:
@@ -238,7 +237,7 @@ def train_one_epoch(args, train_loader, model_flownet, model_raft, optimizer, ep
                 for i in range(12):
                     loss += loss_weights[i] * criterion(flow1[i], flow_scales[0] * target)
 
-            tot_loss += loss.item()
+            tot_loss += loss.item()/input.shape[0]
 
             optimizer.zero_grad()
             loss.backward()
@@ -263,7 +262,6 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, wandb_log):
     tot_loss = 0
     for i, (input, target, idx) in enumerate(val_loader):
         target = target.to(args.device)
-        # input = torch.cat(input,1).to(args.device)
         input = input.to(args.device)
         if args.upscale:
             input = tr_f.resize(input, args.upscale)
@@ -279,13 +277,10 @@ def validate(args, val_loader, model_flownet, model_raft, epoch, wandb_log):
 
         flows = flow1
         if not args.unsupervised:
-            # target_64 = tr_f.resize(target, flow1[0].shape[-1])
             loss = criterion(args.div_flow * flow1, args.div_flow * target)
-            if loss < 2:
-                stop = 1
         else:
             loss = warp_loss(feat1, feat2, flows, criterion)
-        tot_loss += loss.item()
+        tot_loss += loss.item()/input.shape[0]
 
     max_val = 10
     avg_epe = (tot_loss / len(val_loader))

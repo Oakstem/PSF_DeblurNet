@@ -12,7 +12,6 @@ class GoWithTheFlownet(nn.Module):
     def __init__(self, device, input_channels=3, batchNorm=True):
         super(GoWithTheFlownet, self).__init__()
 
-        # enc_features = [32, 64, 128, 256, 512, 768]
         enc_features = [256, 384, 512, 768, 1024, 1280]
         self.encoder = Encoder(input_channels=input_channels, batchNorm=batchNorm, enc_features=enc_features).to(device)
 
@@ -55,10 +54,6 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.target_sz = target_sz
 
-        # smaller version:
-        # enc_features = [4, 9, 18, 27, 36, 88]
-        # dec_features = [50, 50, 50, 660, 960, 860]
-        # current feature offset with densenet growth rate = 12:
         feature_offs_5 = 20
         feature_offs_4 = 15
         feature_offs_3 = 10
@@ -74,27 +69,12 @@ class Decoder(nn.Module):
         self.decoders.append(DenseBlock(num_input_features=2 * enc_features[4], growth_rate=4).to(device))
         self.decoders.append(DenseBlock(num_input_features=1 * enc_features[5], growth_rate=4).to(device))
 
-        # self.dec_pwc6 = nn.Conv2d(2*enc_features[5]+feature_offs_5, 196, kernel_size=1, stride=1, padding=0, bias=False)
-        # self.dec_pwc5 = nn.Conv2d(3 * enc_features[4] + feature_offs_5, 128, kernel_size=1, stride=1, padding=0, bias=False)
-        # self.dec_pwc4 = nn.Conv2d(3 * enc_features[3] + feature_offs_4, 96, kernel_size=1, stride=1, padding=0, bias=False)
-        # self.dec_pwc3 = nn.Conv2d(3 * enc_features[2] + feature_offs_3, 64, kernel_size=1, stride=1, padding=0, bias=False)
-        # self.dec_pwc2 = nn.Conv2d(3 * enc_features[1] + feature_offs_2, 32, kernel_size=1, stride=1, padding=0, bias=False)
-        # self.dec_pwc1 = nn.Conv2d(3 * enc_features[0] + feature_offs_1, 16, kernel_size=1, stride=1, padding=0, bias=False)
-
         self.dec6_up = deconv(1 * enc_features[5] + feature_offs_5, enc_features[4])
         self.dec5_up = deconv(2 * enc_features[4] + feature_offs_5, enc_features[3])
         self.dec4_up = deconv(2 * enc_features[3] + feature_offs_4, enc_features[2])
         self.dec3_up = deconv(2 * enc_features[2] + feature_offs_3, enc_features[1])
         self.dec2_up = deconv(2 * enc_features[1] + feature_offs_2, enc_features[0])
         self.dec1_up = deconv(2 * enc_features[0] + feature_offs_1, input_channels)
-
-        self.dec6_torgb = conv_block(batchNorm, enc_features[4], 3)
-        self.dec5_torgb = conv(batchNorm, enc_features[3], 3)
-        self.dec4_torgb = conv(batchNorm, enc_features[2], 3)
-        # self.dec3_torgb = conv(batchNorm, enc_features[1], 3)
-        self.dec2_torgb = conv(batchNorm, enc_features[0], 3)
-
-        self.dec3_torgb_up = deconv(enc_features[1], 3)
 
         # self.flow6_up = Up(in_channels=2 * enc_features[5] + feature_offs_5, out_channels=3, ups_factor=25, target_sz=128)
         # self.flow5_up = Up(in_channels=3 * enc_features[4] + feature_offs_5, out_channels=3, ups_factor=14, target_sz=128)
@@ -104,90 +84,30 @@ class Decoder(nn.Module):
         self.flow1_up = Up(in_channels=2 * enc_features[0] + feature_offs_1, out_channels=3, ups_factor=2,
                            target_sz=target_sz)
 
+        # STN's
         # self.trs = [SpatialTransformer(enc_features[i], level=i).to(device) for i in range(levels)]
 
     def forward(self, encs):
         # trs = [self.trs[idx](enc) for idx, enc in enumerate(encs)]
 
-        # dec6 size: Bx860x5x5
-        # upscaled output: Bx3x128x128
-        # flow downscale factor: 128/264 = 0.5
-        # dec6 = self.decoders[5](torch.cat((encs[5], trs[5]), dim=1))
         dec6 = self.decoders[5](encs[5])
         dec_up6 = crop_like(self.dec6_up(dec6), encs[4])
-        # dec_pwc6 = self.dec_pwc6(dec6)
-        # dec_rgb6 = self.flow6_up(dec6)
-        # dec_rgb6 = self.dec6_torgb(dec_up6)
-        # if dec_rgb6.shape[-1]/8 != dec_rgb6.shape[-1]//8:
-        #     sz = 8*(dec_rgb6.shape[-1]//8)
-        #     dec_rgb6 = dec_rgb6[:,:,:sz,:sz]
 
-        # dec5 size: Bx960x9x9
-        # upscaled output: Bx3x128x128
-        # flow downscale factor: 128/264 = 0.5
         dec5 = self.decoders[4](torch.cat((encs[4], dec_up6), dim=1))
         dec_up5 = crop_like(self.dec5_up(dec5), encs[3])
-        # dec_pwc5 = self.dec_pwc5(dec5)
-        # dec_rgb5 = self.flow5_up(dec5)
-        # dec_rgb5 = self.dec5_torgb(dec_up5)
-        # if dec_rgb5.shape[-1]/8 != dec_rgb5.shape[-1]//8:
-        #     sz = 8*(dec_rgb5.shape[-1]//8)
-        #     dec_rgb5 = dec_rgb5[:,:,:sz,:sz]
 
-        # dec4 size: Bx660x17x17
-        # upscaled output: Bx3x264x264
-        # flow downscale factor: 128/264 = 0.5
         dec4 = self.decoders[3](torch.cat((encs[3], dec_up5), dim=1))
         dec_up4 = crop_like(self.dec4_up(dec4), encs[2])
-        # dec_pwc4 = self.dec_pwc4(dec4)
-        # dec_rgb4 = self.flow4_up(dec4)
-        # dec_rgb4 = self.dec4_torgb(dec_up4)
-        # if dec_rgb4.shape[-1]/8 != dec_rgb4.shape[-1]//8:
-        #     sz = 8*(dec_rgb4.shape[-1]//8)
-        #     dec_rgb4 = dec_rgb4[:,:,:sz,:sz]
 
-        # dec3 size: Bx660x33x33
-        # upscaled output: Bx3x128x128
-        # flow downscale factor: 128/264 = 0.5
         dec3 = self.decoders[2](torch.cat((encs[2], dec_up4), dim=1))
         dec_up3 = crop_like(self.dec3_up(dec3), encs[1])
-        # dec_pwc3 = self.dec_pwc3(dec3)
-        # dec_rgb3 = self.flow3_up(dec3)
-        # dec_rgb3 = self.dec3_torgb_up(dec_up3)
-        # if dec_rgb3.shape[-1]/8 != dec_rgb3.shape[-1]//8:
-        #     sz = 8*(dec_rgb3.shape[-1]//8)
-        #     dec_rgb3 = dec_rgb3[:,:,:sz,:sz]
 
-        # dec2 size: Bx360x66x66
-        # upscaled output: Bx3x264x264
-        # flow downscale factor: 264/264 = 1.0
         dec2 = self.decoders[1](torch.cat((encs[1], dec_up3), dim=1))
         dec_up2 = crop_like(self.dec2_up(dec2), encs[0])
-        # dec_pwc2 = self.dec_pwc2(dec2)
-        # dec_rgb2 = self.flow2_up(dec2)
-        # dec_rgb2 = self.dec2_torgb(dec_up2)
-        # if dec_rgb2.shape[-1]/8 != dec_rgb2.shape[-1]//8:
-        #     sz = 8*(dec_rgb2.shape[-1]//8)
-        #     dec_rgb2 = dec_rgb2[:,:,:sz,:sz]
 
-        # dec1 size: Bx210x132x132
-        # upscaled output: Bx3x264x264
-        # flow downscale factor: 264/264 = 1.0
         dec1 = self.decoders[0](torch.cat((encs[0], dec_up2), dim=1))
         dec_rgb1 = self.flow1_up(dec1)
-        # dec_pwc1 = self.dec_pwc1(dec1)
-        # dec_up1 = self.dec1_up(dec1)
-        # if dec_up1.shape[-1]/8 != dec_up1.shape[-1]//8:
-        #     sz = 8*(dec_up1.shape[-1]//8)
-        #     dec_up1 = dec_up1[:,:,:sz,:sz]
 
-        # dec5 = self.decoders[5](torch.cat((encs[4], trs[4], dec_up1), dim=1))
-        # dec_up5 = self.dec6_up(dec5)
-
-        # return dec1, dec2, dec3, dec4, dec5, dec6
-        # flows = (dec_rgb1, dec_rgb2, dec_rgb3, dec_rgb4, dec_rgb5, dec_rgb6)
-        # dec_pwc_connect = (dec_pwc1, dec_pwc2, dec_pwc3, dec_pwc4, dec_pwc5, dec_pwc6)
-        # features = (dec1, dec2, dec3, dec4, dec5, dec6)
         return dec_rgb1
 
 
